@@ -1,16 +1,78 @@
-# React + Vite
+# EmoMotion
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+AI-powered athlete emotion tracking app for coaches and athletes.
 
-Currently, two official plugins are available:
+![React](https://img.shields.io/badge/React-19-blue)
+![Vite](https://img.shields.io/badge/Vite-7-purple)
+![TailwindCSS](https://img.shields.io/badge/TailwindCSS-4-cyan)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Overview
 
-## React Compiler
+EmoMotion helps sports teams monitor athlete wellness through daily emotional check-ins. Athletes complete quick assessments, and coaches get real-time insights into team readiness.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Features
 
-## Expanding the ESLint configuration
+### Athlete Check-in Flow
+- Welcome screen with quick start
+- Mood selection (Rough, Low, Okay, Good, Locked In)
+- Energy level slider (0-100)
+- Sleep quality assessment
+- AI-powered facial scan (placeholder)
+- Personalized AI insights and readiness score
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+### Coach Dashboard
+- Team overview with key metrics
+- Real-time alerts for athletes needing attention
+- 7-day trend visualization
+- Individual athlete profiles with detailed analytics
+- AI-generated coaching recommendations
+
+## Tech Stack
+
+- **React 19** - UI framework
+- **Vite** - Build tool
+- **Tailwind CSS** - Styling
+- **React Router** - Navigation
+- **Recharts** - Data visualization
+
+## Getting Started
+
+```bash
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+
+# Build for production
+npm run build
+```
+
+## Project Structure
+
+```
+src/
+├── components/
+│   ├── Header.jsx       # Navigation header
+│   ├── ScoreCircle.jsx  # Circular score display
+│   └── StatusBadge.jsx  # Status indicators (green/yellow/red)
+├── pages/
+│   ├── athlete/
+│   │   └── AthleteCheckIn.jsx  # Check-in flow
+│   └── coach/
+│       ├── CoachDashboard.jsx  # Team overview
+│       └── PlayerDetail.jsx    # Individual athlete view
+└── App.jsx              # Routes configuration
+```
+
+## Routes
+
+| Route | Description |
+|-------|-------------|
+| `/athlete` | Athlete daily check-in flow |
+| `/coach` | Coach team dashboard |
+| `/coach/athlete/:id` | Individual athlete details |
+
+## License
+
+MIT
