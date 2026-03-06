@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'
 import Header from './components/Header'
 import AthleteCheckIn from './pages/athlete/AthleteCheckIn'
 import CoachDashboard from './pages/coach/CoachDashboard'
@@ -7,7 +7,7 @@ import './index.css'
 
 function App() {
   return (
-    <BrowserRouter>
+    <HashRouter>
       <div className="min-h-screen bg-[#0f0f0f]">
         <Header />
         <main className="container mx-auto px-4 py-6">
@@ -19,7 +19,7 @@ function App() {
           </Routes>
         </main>
       </div>
-    </BrowserRouter>
+    </HashRouter>
   )
 }
 

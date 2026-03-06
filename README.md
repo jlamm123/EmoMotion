@@ -9,7 +9,7 @@
 
 EmoMotion helps coaches and sports teams monitor athlete emotional wellness through quick daily check-ins. Athletes complete 60-second assessments, and coaches get real-time insights into team readiness with AI-powered recommendations.
 
-**[Live Demo](https://emomotion-demo.netlify.app/)**
+**[Live Demo](https://jlamm123.github.io/EmoMotion/)**
 
 ---
 
@@ -84,6 +84,12 @@ npm run build
 npm run preview
 ```
 
+### Deploy to GitHub Pages
+
+```bash
+npm run deploy
+```
+
 ---
 
 ## Project Structure
@@ -106,7 +112,6 @@ EmoMotion/
 │   ├── App.jsx             # Route configuration
 │   ├── main.jsx            # App entry point
 │   └── index.css           # Global styles & Tailwind
-├── netlify.toml            # Netlify deployment config
 ├── vite.config.js          # Vite configuration
 └── package.json
 ```
@@ -117,9 +122,9 @@ EmoMotion/
 
 | Route | Description |
 |-------|-------------|
-| `/athlete` | Athlete daily check-in flow |
-| `/coach` | Coach team dashboard |
-| `/coach/athlete/:id` | Individual athlete details |
+| `/#/athlete` | Athlete daily check-in flow |
+| `/#/coach` | Coach team dashboard |
+| `/#/coach/athlete/:id` | Individual athlete details |
 
 ---
 
