@@ -2,6 +2,8 @@ import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AppProvider, useApp } from './context/AppContext'
 import Header from './components/Header'
 import Toast from './components/Toast'
+import InstallPrompt from './components/InstallPrompt'
+import LoadingScreen from './components/LoadingScreen'
 import Login from './pages/Login'
 import AthleteHome from './pages/athlete/AthleteHome'
 import AthleteCheckIn from './pages/athlete/AthleteCheckIn'
@@ -14,11 +16,7 @@ function ProtectedRoute({ children, allowedTypes }) {
   const { isAuthenticated, user, loading } = useApp()
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-[#0f0f0f] flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-[#ff5c5c] border-t-transparent rounded-full animate-spin" />
-      </div>
-    )
+    return null
   }
 
   if (!isAuthenticated) {
@@ -32,16 +30,12 @@ function ProtectedRoute({ children, allowedTypes }) {
   return children
 }
 
-// Public route wrapper (redirects if already logged in)
+// Public route wrapper
 function PublicRoute({ children }) {
   const { isAuthenticated, user, loading } = useApp()
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-[#0f0f0f] flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-[#ff5c5c] border-t-transparent rounded-full animate-spin" />
-      </div>
-    )
+    return null
   }
 
   if (isAuthenticated) {
@@ -52,10 +46,27 @@ function PublicRoute({ children }) {
 }
 
 function AppRoutes() {
+  const { loading, modelsLoaded, modelLoadingProgress } = useApp()
+
+  // Show loading screen while models are loading
+  if (!modelsLoaded) {
+    const message = modelLoadingProgress < 50
+      ? 'Loading AI models...'
+      : modelLoadingProgress < 100
+      ? 'Almost ready...'
+      : 'Starting app...'
+
+    return <LoadingScreen progress={modelLoadingProgress} message={message} />
+  }
+
+  if (loading) {
+    return <LoadingScreen progress={100} message="Loading..." />
+  }
+
   return (
-    <div className="min-h-screen bg-[#0f0f0f]">
+    <div className="min-h-screen bg-[#0a0a0f]">
       <Header />
-      <main className="container mx-auto px-4 py-6">
+      <main className="pb-safe">
         <Routes>
           {/* Public routes */}
           <Route
@@ -116,6 +127,7 @@ function AppRoutes() {
         </Routes>
       </main>
       <Toast />
+      <InstallPrompt />
     </div>
   )
 }

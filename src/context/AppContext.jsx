@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import * as faceapi from 'face-api.js'
 import { athletes as athleteList, coach, generateHistoricalData } from '../data/mockData'
 import {
   initializeDatabase,
@@ -21,10 +22,38 @@ const AppContext = createContext(null)
 
 export function AppProvider({ children }) {
   const [user, setUser] = useState(null)
-  const [athletes, setAthletes] = useState(athleteList)
   const [loading, setLoading] = useState(true)
+  const [modelsLoaded, setModelsLoaded] = useState(false)
+  const [modelLoadingProgress, setModelLoadingProgress] = useState(0)
   const [toast, setToast] = useState(null)
   const [notifications, setNotifications] = useState([])
+  const [showInstallPrompt, setShowInstallPrompt] = useState(false)
+  const [deferredPrompt, setDeferredPrompt] = useState(null)
+
+  // Load face-api models
+  useEffect(() => {
+    const loadModels = async () => {
+      try {
+        const MODEL_URL = import.meta.env.BASE_URL + 'models'
+
+        setModelLoadingProgress(20)
+        await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL)
+
+        setModelLoadingProgress(60)
+        await faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL)
+
+        setModelLoadingProgress(100)
+        setModelsLoaded(true)
+        console.log('Face-api models loaded')
+      } catch (error) {
+        console.error('Error loading face-api models:', error)
+        // Continue without face detection
+        setModelsLoaded(true)
+      }
+    }
+
+    loadModels()
+  }, [])
 
   // Initialize database and load user on mount
   useEffect(() => {
@@ -40,6 +69,38 @@ export function AppProvider({ children }) {
     setLoading(false)
   }, [])
 
+  // Handle PWA install prompt
+  useEffect(() => {
+    const handler = (e) => {
+      e.preventDefault()
+      setDeferredPrompt(e)
+      // Show install prompt after a delay
+      setTimeout(() => {
+        setShowInstallPrompt(true)
+      }, 5000)
+    }
+
+    window.addEventListener('beforeinstallprompt', handler)
+    return () => window.removeEventListener('beforeinstallprompt', handler)
+  }, [])
+
+  // Install PWA
+  const installPWA = useCallback(async () => {
+    if (!deferredPrompt) return false
+
+    deferredPrompt.prompt()
+    const { outcome } = await deferredPrompt.userChoice
+
+    setDeferredPrompt(null)
+    setShowInstallPrompt(false)
+
+    return outcome === 'accepted'
+  }, [deferredPrompt])
+
+  const dismissInstallPrompt = useCallback(() => {
+    setShowInstallPrompt(false)
+  }, [])
+
   // Login functions
   const loginAsAthlete = useCallback((athleteId) => {
     const athlete = athleteList.find(a => a.id === athleteId)
@@ -47,6 +108,7 @@ export function AppProvider({ children }) {
       const userData = { type: 'athlete', ...athlete }
       setUser(userData)
       setCurrentUser(userData)
+      vibrate()
       return true
     }
     return false
@@ -57,6 +119,7 @@ export function AppProvider({ children }) {
       const userData = { type: 'coach', ...coach }
       setUser(userData)
       setCurrentUser(userData)
+      vibrate()
       return true
     }
     return false
@@ -65,13 +128,14 @@ export function AppProvider({ children }) {
   const logout = useCallback(() => {
     setUser(null)
     clearCurrentUser()
+    vibrate()
   }, [])
 
   // Check-in functions
   const saveCheckIn = useCallback((checkInData) => {
     const saved = dbSaveCheckIn(checkInData)
-    // Refresh notifications
     setNotifications(getUnreadNotifications())
+    vibrate([100, 50, 100])
     return saved
   }, [])
 
@@ -92,7 +156,15 @@ export function AppProvider({ children }) {
   // Toast notifications
   const showToast = useCallback((message, type = 'success') => {
     setToast({ message, type, id: Date.now() })
+    vibrate(50)
     setTimeout(() => setToast(null), 3000)
+  }, [])
+
+  // Haptic feedback
+  const vibrate = useCallback((pattern = 50) => {
+    if ('vibrate' in navigator) {
+      navigator.vibrate(pattern)
+    }
   }, [])
 
   // Mark notifications as read
@@ -114,6 +186,10 @@ export function AppProvider({ children }) {
     isCoach: user?.type === 'coach',
     loading,
 
+    // Model loading state
+    modelsLoaded,
+    modelLoadingProgress,
+
     // Auth functions
     loginAsAthlete,
     loginAsCoach,
@@ -132,12 +208,20 @@ export function AppProvider({ children }) {
     toast,
     showToast,
 
+    // Haptic feedback
+    vibrate,
+
     // Notifications
     notifications,
     clearNotifications,
     refreshNotifications,
 
-    // Database utilities (re-exported for convenience)
+    // PWA Install
+    showInstallPrompt,
+    installPWA,
+    dismissInstallPrompt,
+
+    // Database utilities
     getTeamStats,
     getWeeklyTrend,
     getAthleteWithStats,

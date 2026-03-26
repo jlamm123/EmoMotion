@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts'
 import { useApp } from '../../context/AppContext'
 import StatusBadge from '../../components/StatusBadge'
 
@@ -14,8 +14,8 @@ const getStatus = (score) => {
 const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-[#252525] border border-[#404040] rounded-lg px-3 py-2">
-        <p className="text-[#a0a0a0] text-xs mb-1">{label}</p>
+      <div className="glass-card px-3 py-2 text-sm">
+        <p className="text-[#9ca3af] text-xs mb-1">{label}</p>
         <p className="text-white font-semibold">{payload[0].value ?? 'No data'}</p>
       </div>
     )
@@ -24,32 +24,39 @@ const CustomTooltip = ({ active, payload, label }) => {
 }
 
 export default function CoachDashboard() {
-  const { athletes, getTeamStats, getWeeklyTrend, getAthleteWithStats, notifications, clearNotifications } = useApp()
+  const { athletes, getTeamStats, getWeeklyTrend, getAthleteWithStats, notifications, clearNotifications, vibrate } = useApp()
   const [teamStats, setTeamStats] = useState({ teamAverage: 0, checkedInCount: 0, alertCount: 0, watchCount: 0 })
   const [weeklyTrend, setWeeklyTrend] = useState([])
   const [athletesWithStats, setAthletesWithStats] = useState([])
-  const [showNotifications, setShowNotifications] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
 
-  // Refresh data periodically to catch new check-ins
-  useEffect(() => {
-    const loadData = () => {
-      setTeamStats(getTeamStats())
-      setWeeklyTrend(getWeeklyTrend())
-      setAthletesWithStats(athletes.map(a => getAthleteWithStats(a)))
-    }
-
-    loadData()
-    const interval = setInterval(loadData, 5000) // Refresh every 5 seconds
-
-    return () => clearInterval(interval)
+  const loadData = useCallback(() => {
+    setTeamStats(getTeamStats())
+    setWeeklyTrend(getWeeklyTrend())
+    setAthletesWithStats(athletes.map(a => getAthleteWithStats(a)))
   }, [athletes, getTeamStats, getWeeklyTrend, getAthleteWithStats])
 
-  // Sort athletes: those needing attention first (lowest scores), then unchecked
+  // Initial load and periodic refresh
+  useEffect(() => {
+    loadData()
+    const interval = setInterval(loadData, 5000)
+    return () => clearInterval(interval)
+  }, [loadData])
+
+  // Pull to refresh simulation
+  const handleRefresh = () => {
+    setIsRefreshing(true)
+    vibrate(50)
+    setTimeout(() => {
+      loadData()
+      setIsRefreshing(false)
+    }, 1000)
+  }
+
+  // Sort athletes: those needing attention first
   const sortedAthletes = [...athletesWithStats].sort((a, b) => {
-    // Unchecked athletes go to the end
     if (!a.hasCheckedInToday && b.hasCheckedInToday) return 1
     if (a.hasCheckedInToday && !b.hasCheckedInToday) return -1
-    // Among checked-in athletes, sort by score (lowest first)
     if (a.hasCheckedInToday && b.hasCheckedInToday) {
       return a.score - b.score
     }
@@ -60,7 +67,6 @@ export default function CoachDashboard() {
   const getWeeklyChange = () => {
     const validDays = weeklyTrend.filter(d => d.score !== null)
     if (validDays.length < 2) return null
-
     const recent = validDays[validDays.length - 1].score
     const previous = validDays[0].score
     return recent - previous
@@ -68,96 +74,85 @@ export default function CoachDashboard() {
 
   const weeklyChange = getWeeklyChange()
 
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Eagles Basketball</h1>
-          <p className="text-[#a0a0a0]">Team Wellness Dashboard</p>
-        </div>
-        <div className="flex items-center gap-4">
-          {/* Notifications */}
-          <div className="relative">
-            <button
-              onClick={() => { setShowNotifications(!showNotifications); if (notifications.length > 0) clearNotifications(); }}
-              className="relative p-2 rounded-lg hover:bg-[#252525] transition-colors"
-            >
-              <svg className="w-6 h-6 text-[#a0a0a0]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-              </svg>
-              {notifications.length > 0 && (
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#ff5c5c] rounded-full flex items-center justify-center text-xs font-bold">
-                  {notifications.length}
-                </span>
-              )}
-            </button>
-          </div>
+  // Check if athlete checked in recently (within last hour)
+  const isNewCheckIn = (athlete) => {
+    if (!athlete.todayCheckIn) return false
+    const checkInTime = new Date(athlete.todayCheckIn.timestamp)
+    const hourAgo = new Date(Date.now() - 60 * 60 * 1000)
+    return checkInTime > hourAgo
+  }
 
-          <div className="flex items-center gap-2 text-sm text-[#a0a0a0]">
-            <div className={`w-2 h-2 rounded-full ${teamStats.checkedInCount > 0 ? 'bg-green-400 animate-pulse' : 'bg-[#606060]'}`} />
-            {teamStats.checkedInCount}/{athletes.length} checked in today
-          </div>
+  return (
+    <div className="min-h-[calc(100vh-80px)] px-4 py-6">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6 animate-fade-in">
+        <div>
+          <h1 className="font-display text-4xl">EAGLES BASKETBALL</h1>
+          <p className="text-[#9ca3af]">Team Wellness Dashboard</p>
+        </div>
+        <div className="flex items-center gap-3">
+          {/* Refresh button */}
+          <button
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className="p-2 rounded-xl glass-card btn-press"
+          >
+            <svg className={`w-5 h-5 text-[#9ca3af] ${isRefreshing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
+
+          {/* Notifications */}
+          <button
+            onClick={() => { if (notifications.length > 0) { clearNotifications(); vibrate(30); } }}
+            className="relative p-2 rounded-xl glass-card btn-press"
+          >
+            <svg className="w-5 h-5 text-[#9ca3af]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+            </svg>
+            {notifications.length > 0 && (
+              <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#ff4757] rounded-full flex items-center justify-center text-xs font-bold animate-pulse">
+                {notifications.length}
+              </span>
+            )}
+          </button>
         </div>
       </div>
 
+      {/* Check-in status */}
+      <div className="flex items-center gap-2 text-sm text-[#9ca3af] mb-6 animate-fade-in stagger-1">
+        <div className={`w-2 h-2 rounded-full ${teamStats.checkedInCount > 0 ? 'bg-[#00ff88] animate-pulse' : 'bg-[#6b7280]'}`} />
+        {teamStats.checkedInCount}/{athletes.length} checked in today
+      </div>
+
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-4 mb-6">
         {/* Team Average */}
-        <div className="bg-[#1a1a1a] rounded-2xl p-5 border border-[#252525]">
+        <div className="glass-card p-5 animate-fade-in stagger-1">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-[#606060] text-sm">Team Average</span>
-            <div className="w-8 h-8 bg-[#ff5c5c]/20 rounded-lg flex items-center justify-center">
-              <svg className="w-4 h-4 text-[#ff5c5c]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <span className="text-[#6b7280] text-sm">Team Average</span>
+            <div className="w-10 h-10 bg-[#ff4757]/20 rounded-xl flex items-center justify-center">
+              <svg className="w-5 h-5 text-[#ff4757]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
               </svg>
             </div>
           </div>
-          <p className="text-3xl font-bold">{teamStats.checkedInCount > 0 ? teamStats.teamAverage : '--'}</p>
-          <div className="flex items-center gap-1 mt-1">
+          <p className="font-display text-4xl">{teamStats.checkedInCount > 0 ? teamStats.teamAverage : '--'}</p>
+          <div className="flex items-center gap-2 mt-1">
             {teamStats.checkedInCount > 0 && <StatusBadge status={getStatus(teamStats.teamAverage)} size="sm" showLabel={false} />}
-            <span className="text-xs text-[#606060]">{teamStats.checkedInCount > 0 ? 'out of 100' : 'No check-ins yet'}</span>
+            <span className="text-xs text-[#6b7280]">{teamStats.checkedInCount > 0 ? 'out of 100' : 'No data'}</span>
           </div>
-        </div>
-
-        {/* Watch List */}
-        <div className="bg-[#1a1a1a] rounded-2xl p-5 border border-[#252525]">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-[#606060] text-sm">Watch List</span>
-            <div className="w-8 h-8 bg-yellow-500/20 rounded-lg flex items-center justify-center">
-              <svg className="w-4 h-4 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-              </svg>
-            </div>
-          </div>
-          <p className="text-3xl font-bold text-yellow-400">{teamStats.watchCount}</p>
-          <p className="text-xs text-[#606060] mt-1">athletes to monitor</p>
-        </div>
-
-        {/* Alerts */}
-        <div className="bg-[#1a1a1a] rounded-2xl p-5 border border-[#252525]">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-[#606060] text-sm">Alerts</span>
-            <div className="w-8 h-8 bg-red-500/20 rounded-lg flex items-center justify-center">
-              <svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-            </div>
-          </div>
-          <p className="text-3xl font-bold text-red-400">{teamStats.alertCount}</p>
-          <p className="text-xs text-[#606060] mt-1">need attention</p>
         </div>
 
         {/* Weekly Change */}
-        <div className="bg-[#1a1a1a] rounded-2xl p-5 border border-[#252525]">
+        <div className="glass-card p-5 animate-fade-in stagger-2">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-[#606060] text-sm">Weekly Change</span>
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-              weeklyChange === null ? 'bg-[#252525]' :
-              weeklyChange >= 0 ? 'bg-green-500/20' : 'bg-red-500/20'
+            <span className="text-[#6b7280] text-sm">Weekly Change</span>
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+              weeklyChange === null ? 'bg-[#1a1a24]' :
+              weeklyChange >= 0 ? 'bg-[#00ff88]/20' : 'bg-[#ff4757]/20'
             }`}>
-              <svg className={`w-4 h-4 ${weeklyChange === null ? 'text-[#606060]' : weeklyChange >= 0 ? 'text-green-400' : 'text-red-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className={`w-5 h-5 ${weeklyChange === null ? 'text-[#6b7280]' : weeklyChange >= 0 ? 'text-[#00ff88]' : 'text-[#ff4757]'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 {weeklyChange >= 0 ? (
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                 ) : (
@@ -166,116 +161,143 @@ export default function CoachDashboard() {
               </svg>
             </div>
           </div>
-          <p className={`text-3xl font-bold ${weeklyChange === null ? 'text-[#606060]' : weeklyChange >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+          <p className={`font-display text-4xl ${weeklyChange === null ? 'text-[#6b7280]' : weeklyChange >= 0 ? 'text-[#00ff88]' : 'text-[#ff4757]'}`}>
             {weeklyChange === null ? '--' : `${weeklyChange >= 0 ? '+' : ''}${weeklyChange}`}
           </p>
-          <p className="text-xs text-[#606060] mt-1">vs week start</p>
+          <span className="text-xs text-[#6b7280]">vs week start</span>
+        </div>
+
+        {/* Watch List */}
+        <div className="glass-card p-5 animate-fade-in stagger-3">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-[#6b7280] text-sm">Watch List</span>
+            <div className="w-10 h-10 bg-[#ffd93d]/20 rounded-xl flex items-center justify-center">
+              <svg className="w-5 h-5 text-[#ffd93d]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+            </div>
+          </div>
+          <p className="font-display text-4xl text-[#ffd93d]">{teamStats.watchCount}</p>
+          <span className="text-xs text-[#6b7280]">to monitor</span>
+        </div>
+
+        {/* Alerts */}
+        <div className="glass-card p-5 animate-fade-in stagger-4">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-[#6b7280] text-sm">Alerts</span>
+            <div className="w-10 h-10 bg-[#ff4757]/20 rounded-xl flex items-center justify-center">
+              <svg className="w-5 h-5 text-[#ff4757]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+          </div>
+          <p className="font-display text-4xl text-[#ff4757]">{teamStats.alertCount}</p>
+          <span className="text-xs text-[#6b7280]">need attention</span>
         </div>
       </div>
 
       {/* 7-Day Trend Chart */}
-      <div className="bg-[#1a1a1a] rounded-2xl p-6 border border-[#252525]">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-semibold">7-Day Team Trend</h2>
-          <div className="flex items-center gap-2 text-sm text-[#a0a0a0]">
-            <div className="w-3 h-3 bg-[#ff5c5c] rounded-full" />
-            Team Average
+      <div className="glass-card p-6 mb-6 animate-fade-in stagger-5">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-semibold text-lg">7-Day Trend</h2>
+          <div className="flex items-center gap-2 text-sm text-[#9ca3af]">
+            <div className="w-3 h-3 bg-[#ff4757] rounded-full" />
+            Team Avg
           </div>
         </div>
-        <div className="h-56">
+        <div className="h-40">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={weeklyTrend}>
+            <AreaChart data={weeklyTrend}>
+              <defs>
+                <linearGradient id="colorScore" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#ff4757" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#ff4757" stopOpacity={0} />
+                </linearGradient>
+              </defs>
               <XAxis
                 dataKey="day"
                 axisLine={false}
                 tickLine={false}
-                tick={{ fill: '#606060', fontSize: 12 }}
+                tick={{ fill: '#6b7280', fontSize: 12 }}
               />
               <YAxis
                 domain={[0, 100]}
                 axisLine={false}
                 tickLine={false}
-                tick={{ fill: '#606060', fontSize: 12 }}
-                ticks={[0, 25, 50, 75, 100]}
+                tick={{ fill: '#6b7280', fontSize: 12 }}
+                width={30}
               />
               <Tooltip content={<CustomTooltip />} />
-              <Line
+              <Area
                 type="monotone"
                 dataKey="score"
-                stroke="#ff5c5c"
+                stroke="#ff4757"
                 strokeWidth={3}
-                dot={{ fill: '#ff5c5c', strokeWidth: 0, r: 5 }}
-                activeDot={{ fill: '#ff5c5c', strokeWidth: 0, r: 7 }}
+                fill="url(#colorScore)"
                 connectNulls={false}
               />
-            </LineChart>
+            </AreaChart>
           </ResponsiveContainer>
         </div>
       </div>
 
       {/* Team Roster */}
-      <div className="bg-[#1a1a1a] rounded-2xl border border-[#252525] overflow-hidden">
-        <div className="p-4 border-b border-[#252525] flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Team Roster</h2>
-          <span className="text-sm text-[#606060]">{athletes.length} athletes</span>
+      <div className="glass-card overflow-hidden animate-fade-in stagger-6">
+        <div className="p-4 border-b border-white/10 flex items-center justify-between">
+          <h2 className="font-semibold text-lg">Team Roster</h2>
+          <span className="text-sm text-[#6b7280]">{athletes.length} athletes</span>
         </div>
 
-        {/* Table Header */}
-        <div className="grid grid-cols-12 gap-4 px-4 py-3 bg-[#151515] text-xs text-[#606060] uppercase tracking-wide">
-          <div className="col-span-5">Athlete</div>
-          <div className="col-span-3">Position</div>
-          <div className="col-span-2 text-center">Score</div>
-          <div className="col-span-2 text-center">Status</div>
-        </div>
-
-        {/* Athletes List */}
-        <div className="divide-y divide-[#252525]">
-          {sortedAthletes.map((athlete) => (
+        <div className="divide-y divide-white/10">
+          {sortedAthletes.map((athlete, index) => (
             <Link
               key={athlete.id}
               to={`/coach/athlete/${athlete.id}`}
-              className="grid grid-cols-12 gap-4 px-4 py-4 items-center hover:bg-[#252525]/50 transition-colors"
+              className={`flex items-center gap-4 p-4 hover:bg-white/5 transition-colors btn-press animate-fade-in stagger-${Math.min(index + 1, 8)}`}
             >
-              {/* Name & Avatar */}
-              <div className="col-span-5 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-[#252525] flex items-center justify-center text-sm font-medium text-[#a0a0a0]">
+              {/* Avatar */}
+              <div className="relative">
+                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#1a1a24] to-[#12121a] flex items-center justify-center text-sm font-semibold text-[#9ca3af]">
                   {athlete.avatar}
                 </div>
-                <div>
-                  <span className="font-medium">{athlete.name}</span>
-                  {athlete.streak >= 7 && (
-                    <span className="ml-2 text-xs">🔥</span>
-                  )}
-                </div>
+                {isNewCheckIn(athlete) && (
+                  <span className="absolute -top-1 -right-1 px-1.5 py-0.5 bg-[#00d4ff] rounded text-[10px] font-bold text-black">
+                    NEW
+                  </span>
+                )}
               </div>
 
-              {/* Position */}
-              <div className="col-span-3 text-[#a0a0a0]">
-                {athlete.position}
+              {/* Info */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className="font-semibold truncate">{athlete.name}</p>
+                  {athlete.streak >= 7 && <span className="text-sm">🔥</span>}
+                </div>
+                <p className="text-sm text-[#6b7280] truncate">{athlete.position}</p>
               </div>
 
               {/* Score */}
-              <div className="col-span-2 text-center">
+              <div className="text-right">
                 {athlete.hasCheckedInToday ? (
-                  <span className={`text-lg font-bold ${
-                    athlete.score >= 70 ? 'text-green-400' :
-                    athlete.score >= 50 ? 'text-yellow-400' : 'text-red-400'
-                  }`}>
-                    {athlete.score}
-                  </span>
+                  <>
+                    <p className={`text-2xl font-bold ${
+                      athlete.score >= 70 ? 'text-[#00ff88]' :
+                      athlete.score >= 50 ? 'text-[#ffd93d]' : 'text-[#ff4757]'
+                    }`}>
+                      {athlete.score}
+                    </p>
+                    <StatusBadge status={getStatus(athlete.score)} size="sm" showLabel={false} />
+                  </>
                 ) : (
-                  <span className="text-[#606060]">--</span>
+                  <span className="text-[#6b7280] text-sm">Not checked in</span>
                 )}
               </div>
 
-              {/* Status */}
-              <div className="col-span-2 flex justify-center">
-                {athlete.hasCheckedInToday ? (
-                  <StatusBadge status={getStatus(athlete.score)} size="sm" />
-                ) : (
-                  <span className="text-xs text-[#606060] bg-[#252525] px-2 py-1 rounded">Not checked in</span>
-                )}
-              </div>
+              {/* Arrow */}
+              <svg className="w-5 h-5 text-[#6b7280]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
             </Link>
           ))}
         </div>

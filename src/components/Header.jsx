@@ -4,47 +4,51 @@ import { useApp } from '../context/AppContext'
 export default function Header() {
   const location = useLocation()
   const navigate = useNavigate()
-  const { user, isAuthenticated, logout } = useApp()
+  const { user, isAuthenticated, logout, vibrate } = useApp()
 
   const isCoachRoute = location.pathname.startsWith('/coach')
   const isLoginPage = location.pathname === '/login' || location.pathname === '/'
 
   const handleLogout = () => {
+    vibrate(50)
     logout()
     navigate('/login')
   }
 
   return (
-    <header className="bg-[#1a1a1a] border-b border-[#252525]">
+    <header className="glass-card border-0 border-b border-white/10 safe-top sticky top-0 z-50">
       <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-        <Link to={isAuthenticated ? (user?.type === 'coach' ? '/coach' : '/athlete') : '/login'} className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-[#ff5c5c] rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-sm">E</span>
+        <Link
+          to={isAuthenticated ? (user?.type === 'coach' ? '/coach' : '/athlete') : '/login'}
+          className="flex items-center gap-3 btn-press"
+        >
+          <div className="w-10 h-10 bg-gradient-to-br from-[#ff4757] to-[#ff6b81] rounded-xl flex items-center justify-center shadow-lg shadow-[#ff4757]/20">
+            <span className="text-white font-black text-lg">E</span>
           </div>
-          <span className="text-xl font-bold text-white">EmoMotion</span>
+          <span className="font-display text-2xl tracking-wide hidden sm:block">EMOMOTION</span>
         </Link>
 
         {isAuthenticated && !isLoginPage && (
-          <div className="flex items-center gap-4">
-            {/* Navigation (only show for coach) */}
+          <div className="flex items-center gap-3">
+            {/* Navigation for coach */}
             {user?.type === 'coach' && (
-              <nav className="hidden sm:flex gap-1">
+              <nav className="hidden sm:flex gap-1 glass-card p-1 rounded-xl">
                 <Link
                   to="/athlete"
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all btn-press ${
                     !isCoachRoute
-                      ? 'bg-[#ff5c5c] text-white'
-                      : 'text-[#a0a0a0] hover:text-white hover:bg-[#252525]'
+                      ? 'bg-gradient-to-r from-[#ff4757] to-[#ff6b81] text-white'
+                      : 'text-[#9ca3af] hover:text-white'
                   }`}
                 >
-                  Athlete View
+                  Athlete
                 </Link>
                 <Link
                   to="/coach"
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all btn-press ${
                     isCoachRoute
-                      ? 'bg-[#ff5c5c] text-white'
-                      : 'text-[#a0a0a0] hover:text-white hover:bg-[#252525]'
+                      ? 'bg-gradient-to-r from-[#ff4757] to-[#ff6b81] text-white'
+                      : 'text-[#9ca3af] hover:text-white'
                   }`}
                 >
                   Coach
@@ -52,25 +56,21 @@ export default function Header() {
               </nav>
             )}
 
-            {/* User info and logout */}
-            <div className="flex items-center gap-3">
-              <div className="hidden sm:block text-right">
-                <p className="text-sm font-medium">{user?.name}</p>
-                <p className="text-xs text-[#606060] capitalize">{user?.type}</p>
-              </div>
-              <div className="w-9 h-9 rounded-full bg-[#252525] flex items-center justify-center text-sm font-medium text-[#a0a0a0]">
-                {user?.type === 'coach' ? '📋' : user?.avatar}
-              </div>
-              <button
-                onClick={handleLogout}
-                className="p-2 rounded-lg hover:bg-[#252525] transition-colors text-[#a0a0a0] hover:text-white"
-                title="Logout"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                </svg>
-              </button>
+            {/* User avatar */}
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#1a1a24] to-[#12121a] border border-white/10 flex items-center justify-center text-sm font-semibold text-[#9ca3af]">
+              {user?.type === 'coach' ? '📋' : user?.avatar}
             </div>
+
+            {/* Logout */}
+            <button
+              onClick={handleLogout}
+              className="p-2 rounded-xl glass-card transition-colors btn-press"
+              title="Logout"
+            >
+              <svg className="w-5 h-5 text-[#9ca3af]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+            </button>
           </div>
         )}
       </div>

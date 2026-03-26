@@ -5,25 +5,32 @@ export default function Toast() {
 
   if (!toast) return null
 
-  const bgColor = {
-    success: 'bg-green-500',
-    error: 'bg-red-500',
-    warning: 'bg-yellow-500',
-    info: 'bg-blue-500',
-  }[toast.type] || 'bg-green-500'
+  const styles = {
+    success: {
+      bg: 'from-[#00ff88] to-[#00d4ff]',
+      icon: '✓',
+    },
+    error: {
+      bg: 'from-[#ff4757] to-[#ff6b81]',
+      icon: '✕',
+    },
+    warning: {
+      bg: 'from-[#ffd93d] to-[#ffb347]',
+      icon: '⚠',
+    },
+    info: {
+      bg: 'from-[#00d4ff] to-[#00ff88]',
+      icon: 'ℹ',
+    },
+  }
 
-  const icon = {
-    success: '✓',
-    error: '✕',
-    warning: '⚠',
-    info: 'ℹ',
-  }[toast.type] || '✓'
+  const style = styles[toast.type] || styles.success
 
   return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-slide-up">
-      <div className={`${bgColor} text-white px-6 py-3 rounded-xl shadow-lg flex items-center gap-3`}>
-        <span className="text-lg">{icon}</span>
-        <span className="font-medium">{toast.message}</span>
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] animate-slide-up safe-bottom">
+      <div className={`bg-gradient-to-r ${style.bg} text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3`}>
+        <span className="text-xl font-bold">{style.icon}</span>
+        <span className="font-semibold">{toast.message}</span>
       </div>
     </div>
   )

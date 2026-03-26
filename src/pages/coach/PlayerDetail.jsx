@@ -16,8 +16,8 @@ const getStatus = (score) => {
 const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-[#252525] border border-[#404040] rounded-lg px-3 py-2">
-        <p className="text-[#a0a0a0] text-xs mb-1">{label}</p>
+      <div className="glass-card px-3 py-2 text-sm">
+        <p className="text-[#9ca3af] text-xs mb-1">{label}</p>
         {payload.map((entry, index) => (
           <p key={index} className="text-sm" style={{ color: entry.color }}>
             {entry.name}: {entry.value ?? 'N/A'}
@@ -31,7 +31,7 @@ const CustomTooltip = ({ active, payload, label }) => {
 
 export default function PlayerDetail() {
   const { id } = useParams()
-  const { athletes, getAthleteWithStats, getCheckInsByAthleteId } = useApp()
+  const { athletes, getAthleteWithStats, getCheckInsByAthleteId, vibrate } = useApp()
 
   const [athlete, setAthlete] = useState(null)
   const [checkIns, setCheckIns] = useState([])
@@ -49,7 +49,6 @@ export default function PlayerDetail() {
       const allCheckIns = getCheckInsByAthleteId(athleteId)
       setCheckIns(allCheckIns)
 
-      // Generate history data for charts
       const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
       const history = []
 
@@ -57,7 +56,6 @@ export default function PlayerDetail() {
         const date = new Date()
         date.setDate(date.getDate() - i)
         const dateStr = date.toISOString().split('T')[0]
-
         const checkIn = allCheckIns.find(c => c.timestamp.startsWith(dateStr))
 
         history.push({
@@ -65,7 +63,6 @@ export default function PlayerDetail() {
           score: checkIn?.score ?? null,
           energy: checkIn?.energy ?? null,
           sleep: checkIn?.sleep?.value ?? null,
-          mood: checkIn?.mood?.value ?? null,
         })
       }
 
@@ -76,11 +73,13 @@ export default function PlayerDetail() {
 
   if (!athlete) {
     return (
-      <div className="text-center py-12">
-        <p className="text-[#a0a0a0]">Athlete not found</p>
-        <Link to="/coach" className="text-[#ff5c5c] hover:underline mt-2 inline-block">
-          Back to Dashboard
-        </Link>
+      <div className="min-h-[calc(100vh-80px)] flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-[#9ca3af] mb-4">Athlete not found</p>
+          <Link to="/coach" className="text-[#ff4757] hover:underline">
+            Back to Dashboard
+          </Link>
+        </div>
       </div>
     )
   }
@@ -88,7 +87,6 @@ export default function PlayerDetail() {
   const recentCheckIns = checkIns.slice(0, 5)
   const status = athlete.hasCheckedInToday ? getStatus(athlete.score) : 'none'
 
-  // Generate additional insights based on patterns
   const getPatternInsights = () => {
     const insights = []
 
@@ -96,24 +94,22 @@ export default function PlayerDetail() {
       insights.push(recommendation)
     }
 
-    // Add streak insight
     if (athlete.streak >= 7) {
       insights.push({
         type: 'positive',
         icon: '🔥',
         title: 'Excellent Consistency',
-        text: `${athlete.streak}-day check-in streak! This athlete is committed to their wellness tracking.`,
+        text: `${athlete.streak}-day check-in streak! This athlete is committed to wellness tracking.`,
       })
     } else if (athlete.streak === 0 && !athlete.hasCheckedInToday) {
       insights.push({
         type: 'info',
         icon: '📱',
         title: 'Encourage Check-in',
-        text: 'This athlete hasn\'t checked in today. A quick reminder might help.',
+        text: "This athlete hasn't checked in today. A quick reminder might help.",
       })
     }
 
-    // Energy patterns
     const energyCheckIns = checkIns.filter(c => c.energy !== undefined).slice(0, 7)
     if (energyCheckIns.length >= 3) {
       const avgEnergy = energyCheckIns.reduce((sum, c) => sum + c.energy, 0) / energyCheckIns.length
@@ -133,42 +129,43 @@ export default function PlayerDetail() {
   const patternInsights = getPatternInsights()
 
   return (
-    <div className="space-y-6">
+    <div className="min-h-[calc(100vh-80px)] px-4 py-6">
       <Link
         to="/coach"
-        className="inline-flex items-center gap-2 text-[#a0a0a0] hover:text-white transition-colors"
+        onClick={() => vibrate(30)}
+        className="inline-flex items-center gap-2 text-[#9ca3af] hover:text-white mb-6 transition-colors btn-press"
       >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
         </svg>
         Back to Dashboard
       </Link>
 
       {/* Athlete Header */}
-      <div className="bg-[#1a1a1a] rounded-2xl p-6 border border-[#252525]">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <div className="glass-card p-6 mb-6 animate-fade-in">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
           <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-full bg-[#252525] flex items-center justify-center text-xl font-bold text-[#a0a0a0]">
+            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#1a1a24] to-[#12121a] border border-white/10 flex items-center justify-center text-xl font-bold text-[#9ca3af]">
               {athlete.avatar}
             </div>
             <div>
-              <h1 className="text-2xl font-bold flex items-center gap-2">
+              <h1 className="font-display text-3xl flex items-center gap-2">
                 {athlete.name}
-                {athlete.streak >= 7 && <span className="text-lg">🔥</span>}
+                {athlete.streak >= 7 && <span className="text-xl">🔥</span>}
               </h1>
-              <p className="text-[#a0a0a0]">{athlete.position} • #{athlete.jerseyNumber}</p>
+              <p className="text-[#9ca3af]">{athlete.position} • #{athlete.jerseyNumber}</p>
             </div>
           </div>
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4">
             {athlete.hasCheckedInToday ? (
               <>
-                <ScoreCircle score={athlete.score} size="md" label="Today's Score" />
+                <ScoreCircle score={athlete.score} size="md" animated />
                 <StatusBadge status={status} size="lg" />
               </>
             ) : (
               <div className="text-center">
-                <p className="text-[#606060] text-sm">Not checked in today</p>
-                <p className="text-2xl mt-1">--</p>
+                <p className="text-[#6b7280] text-sm">Not checked in</p>
+                <p className="font-display text-3xl text-[#6b7280]">--</p>
               </div>
             )}
           </div>
@@ -176,86 +173,87 @@ export default function PlayerDetail() {
       </div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-[#1a1a1a] rounded-xl p-4 border border-[#252525]">
-          <p className="text-[#606060] text-sm mb-1">Mood</p>
-          <p className="text-xl font-bold">
-            {athlete.todayCheckIn?.mood?.label || '--'}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+        <div className="glass-card p-4 animate-fade-in stagger-1">
+          <p className="text-[#6b7280] text-sm mb-1">Mood</p>
+          <p className="text-xl font-semibold">
+            {athlete.todayCheckIn?.mood?.emoji} {athlete.todayCheckIn?.mood?.label || '--'}
           </p>
         </div>
-        <div className="bg-[#1a1a1a] rounded-xl p-4 border border-[#252525]">
-          <p className="text-[#606060] text-sm mb-1">Energy</p>
+        <div className="glass-card p-4 animate-fade-in stagger-2">
+          <p className="text-[#6b7280] text-sm mb-1">Energy</p>
           <p className={`text-xl font-bold ${
-            !athlete.todayCheckIn ? 'text-[#606060]' :
-            athlete.todayCheckIn.energy >= 70 ? 'text-green-400' :
-            athlete.todayCheckIn.energy >= 50 ? 'text-yellow-400' : 'text-red-400'
+            !athlete.todayCheckIn ? 'text-[#6b7280]' :
+            athlete.todayCheckIn.energy >= 70 ? 'text-[#00ff88]' :
+            athlete.todayCheckIn.energy >= 50 ? 'text-[#ffd93d]' : 'text-[#ff4757]'
           }`}>
             {athlete.todayCheckIn?.energy ?? '--'}
           </p>
         </div>
-        <div className="bg-[#1a1a1a] rounded-xl p-4 border border-[#252525]">
-          <p className="text-[#606060] text-sm mb-1">Sleep Quality</p>
-          <p className={`text-xl font-bold ${
-            !athlete.todayCheckIn ? 'text-[#606060]' :
-            athlete.todayCheckIn.sleep.value >= 75 ? 'text-green-400' :
-            athlete.todayCheckIn.sleep.value >= 50 ? 'text-yellow-400' : 'text-red-400'
+        <div className="glass-card p-4 animate-fade-in stagger-3">
+          <p className="text-[#6b7280] text-sm mb-1">Sleep</p>
+          <p className={`text-xl font-semibold ${
+            !athlete.todayCheckIn ? 'text-[#6b7280]' :
+            athlete.todayCheckIn.sleep.value >= 75 ? 'text-[#00ff88]' :
+            athlete.todayCheckIn.sleep.value >= 50 ? 'text-[#ffd93d]' : 'text-[#ff4757]'
           }`}>
             {athlete.todayCheckIn?.sleep?.label ?? '--'}
           </p>
         </div>
-        <div className="bg-[#1a1a1a] rounded-xl p-4 border border-[#252525]">
-          <p className="text-[#606060] text-sm mb-1">7-Day Avg</p>
-          <p className="text-xl font-bold text-[#ff5c5c]">
+        <div className="glass-card p-4 animate-fade-in stagger-4">
+          <p className="text-[#6b7280] text-sm mb-1">7-Day Avg</p>
+          <p className="text-xl font-bold text-[#ff4757]">
             {athlete.weeklyAvg ?? '--'}
           </p>
         </div>
       </div>
 
-      {/* Streak Card */}
-      <div className="bg-[#1a1a1a] rounded-xl p-4 border border-[#252525]">
+      {/* Streak */}
+      <div className="glass-card p-4 mb-6 animate-fade-in stagger-5">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-[#606060] text-sm mb-1">Check-in Streak</p>
-            <p className="text-2xl font-bold">
+            <p className="text-[#6b7280] text-sm mb-1">Check-in Streak</p>
+            <p className="font-display text-3xl">
               {athlete.streak} {athlete.streak === 1 ? 'day' : 'days'}
             </p>
           </div>
-          <div className="text-3xl">
+          <div className="text-4xl">
             {athlete.streak >= 7 ? '🔥' : athlete.streak >= 3 ? '⚡' : athlete.streak >= 1 ? '✨' : '💤'}
           </div>
         </div>
       </div>
 
       {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-[#1a1a1a] rounded-2xl p-6 border border-[#252525]">
-          <h2 className="text-lg font-semibold mb-4">7-Day Readiness Trend</h2>
-          <div className="h-48">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <div className="glass-card p-6 animate-fade-in stagger-6">
+          <h2 className="font-semibold text-lg mb-4">7-Day Readiness</h2>
+          <div className="h-40">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={historyData}>
                 <defs>
                   <linearGradient id="scoreGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#ff5c5c" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#ff5c5c" stopOpacity={0} />
+                    <stop offset="5%" stopColor="#ff4757" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#ff4757" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <XAxis
                   dataKey="date"
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fill: '#606060', fontSize: 12 }}
+                  tick={{ fill: '#6b7280', fontSize: 12 }}
                 />
                 <YAxis
                   domain={[0, 100]}
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fill: '#606060', fontSize: 12 }}
+                  tick={{ fill: '#6b7280', fontSize: 12 }}
+                  width={30}
                 />
                 <Tooltip content={<CustomTooltip />} />
                 <Area
                   type="monotone"
                   dataKey="score"
-                  stroke="#ff5c5c"
+                  stroke="#ff4757"
                   strokeWidth={2}
                   fill="url(#scoreGradient)"
                   name="Readiness"
@@ -266,28 +264,29 @@ export default function PlayerDetail() {
           </div>
         </div>
 
-        <div className="bg-[#1a1a1a] rounded-2xl p-6 border border-[#252525]">
-          <h2 className="text-lg font-semibold mb-4">Energy vs Sleep</h2>
-          <div className="h-48">
+        <div className="glass-card p-6 animate-fade-in stagger-7">
+          <h2 className="font-semibold text-lg mb-4">Energy vs Sleep</h2>
+          <div className="h-40">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={historyData}>
                 <XAxis
                   dataKey="date"
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fill: '#606060', fontSize: 12 }}
+                  tick={{ fill: '#6b7280', fontSize: 12 }}
                 />
                 <YAxis
                   domain={[0, 100]}
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fill: '#606060', fontSize: 12 }}
+                  tick={{ fill: '#6b7280', fontSize: 12 }}
+                  width={30}
                 />
                 <Tooltip content={<CustomTooltip />} />
                 <Line
                   type="monotone"
                   dataKey="energy"
-                  stroke="#ff5c5c"
+                  stroke="#ff4757"
                   strokeWidth={2}
                   dot={false}
                   name="Energy"
@@ -296,7 +295,7 @@ export default function PlayerDetail() {
                 <Line
                   type="monotone"
                   dataKey="sleep"
-                  stroke="#22c55e"
+                  stroke="#00ff88"
                   strokeWidth={2}
                   dot={false}
                   name="Sleep"
@@ -307,20 +306,20 @@ export default function PlayerDetail() {
           </div>
           <div className="flex items-center justify-center gap-6 mt-4 text-sm">
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-[#ff5c5c] rounded-full" />
-              <span className="text-[#a0a0a0]">Energy</span>
+              <div className="w-3 h-3 bg-[#ff4757] rounded-full" />
+              <span className="text-[#9ca3af]">Energy</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-green-400 rounded-full" />
-              <span className="text-[#a0a0a0]">Sleep</span>
+              <div className="w-3 h-3 bg-[#00ff88] rounded-full" />
+              <span className="text-[#9ca3af]">Sleep</span>
             </div>
           </div>
         </div>
       </div>
 
       {/* Recent Check-ins */}
-      <div className="bg-[#1a1a1a] rounded-2xl p-6 border border-[#252525]">
-        <h2 className="text-lg font-semibold mb-4">Recent Check-ins</h2>
+      <div className="glass-card p-6 mb-6 animate-fade-in stagger-8">
+        <h2 className="font-semibold text-lg mb-4">Recent Check-ins</h2>
         {recentCheckIns.length > 0 ? (
           <div className="space-y-3">
             {recentCheckIns.map((checkIn, index) => {
@@ -339,57 +338,54 @@ export default function PlayerDetail() {
               }
 
               return (
-                <div key={index} className="flex items-center justify-between p-4 bg-[#252525]/50 rounded-xl">
+                <div key={index} className="flex items-center justify-between p-4 bg-white/5 rounded-xl">
                   <div className="flex items-center gap-4">
-                    <span className="text-sm text-[#606060] w-24">{dateLabel}</span>
-                    <span className="px-3 py-1 bg-[#1a1a1a] rounded-full text-sm flex items-center gap-1">
+                    <span className="text-sm text-[#6b7280] w-20">{dateLabel}</span>
+                    <span className="px-3 py-1 bg-[#1a1a24] rounded-full text-sm flex items-center gap-1">
                       {checkIn.mood.emoji} {checkIn.mood.label}
                     </span>
                   </div>
-                  <div className="flex items-center gap-6 text-sm">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[#606060]">Energy:</span>
-                      <span className="font-medium">{checkIn.energy}</span>
+                  <div className="flex items-center gap-4 text-sm">
+                    <div>
+                      <span className="text-[#6b7280]">E:</span>
+                      <span className="font-medium ml-1">{checkIn.energy}</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[#606060]">Sleep:</span>
-                      <span className="font-medium">{checkIn.sleep.label}</span>
+                    <div>
+                      <span className="text-[#6b7280]">S:</span>
+                      <span className="font-medium ml-1">{checkIn.sleep.label}</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[#606060]">Score:</span>
-                      <span className={`font-bold ${
-                        checkIn.score >= 70 ? 'text-green-400' :
-                        checkIn.score >= 50 ? 'text-yellow-400' : 'text-red-400'
-                      }`}>{checkIn.score}</span>
-                    </div>
+                    <span className={`font-bold text-lg ${
+                      checkIn.score >= 70 ? 'text-[#00ff88]' :
+                      checkIn.score >= 50 ? 'text-[#ffd93d]' : 'text-[#ff4757]'
+                    }`}>{checkIn.score}</span>
                   </div>
                 </div>
               )
             })}
           </div>
         ) : (
-          <p className="text-[#606060] text-center py-8">No check-ins recorded yet</p>
+          <p className="text-[#6b7280] text-center py-8">No check-ins recorded yet</p>
         )}
       </div>
 
       {/* AI Coaching Insights */}
-      <div className="bg-[#1a1a1a] rounded-2xl p-6 border border-[#252525]">
-        <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          <span className="text-[#ff5c5c]">✨</span> AI Coaching Insights
+      <div className="glass-card p-6 animate-fade-in">
+        <h2 className="font-semibold text-lg mb-4 flex items-center gap-2">
+          <span className="text-[#ff4757]">✨</span> AI Coaching Insights
         </h2>
         <div className="space-y-3">
           {patternInsights.map((insight, index) => (
-            <div key={index} className="flex items-start gap-3 p-4 bg-[#252525]/50 rounded-xl">
-              <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 text-xl ${
-                insight.type === 'alert' ? 'bg-red-500/20' :
-                insight.type === 'warning' ? 'bg-yellow-500/20' :
-                insight.type === 'positive' ? 'bg-green-500/20' : 'bg-[#ff5c5c]/20'
+            <div key={index} className="flex items-start gap-3 p-4 bg-white/5 rounded-xl">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-xl ${
+                insight.type === 'alert' ? 'bg-[#ff4757]/20' :
+                insight.type === 'warning' ? 'bg-[#ffd93d]/20' :
+                insight.type === 'positive' ? 'bg-[#00ff88]/20' : 'bg-[#00d4ff]/20'
               }`}>
                 {insight.icon}
               </div>
               <div>
                 <p className="font-medium mb-1">{insight.title}</p>
-                <p className="text-sm text-[#a0a0a0]">{insight.text}</p>
+                <p className="text-sm text-[#9ca3af]">{insight.text}</p>
               </div>
             </div>
           ))}
