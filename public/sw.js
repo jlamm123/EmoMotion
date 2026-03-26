@@ -4,15 +4,15 @@ const DYNAMIC_CACHE = 'emomotion-dynamic-v1';
 
 // Assets to cache immediately
 const STATIC_ASSETS = [
-  '/EmoMotion/',
-  '/EmoMotion/index.html',
-  '/EmoMotion/manifest.json',
-  '/EmoMotion/icons/icon-192.png',
-  '/EmoMotion/icons/icon-512.png',
-  '/EmoMotion/models/tiny_face_detector_model-weights_manifest.json',
-  '/EmoMotion/models/tiny_face_detector_model-shard1',
-  '/EmoMotion/models/face_expression_model-weights_manifest.json',
-  '/EmoMotion/models/face_expression_model-shard1',
+  '/',
+  '/index.html',
+  '/manifest.json',
+  '/icons/icon-192.png',
+  '/icons/icon-512.png',
+  '/models/tiny_face_detector_model-weights_manifest.json',
+  '/models/tiny_face_detector_model-shard1',
+  '/models/face_expression_model-weights_manifest.json',
+  '/models/face_expression_model-shard1',
 ];
 
 // Install event - cache static assets
@@ -77,7 +77,7 @@ self.addEventListener('fetch', (event) => {
         .catch(() => {
           // Return offline fallback for navigation requests
           if (request.mode === 'navigate') {
-            return caches.match('/EmoMotion/index.html');
+            return caches.match('/index.html');
           }
           return new Response('Offline', { status: 503 });
         });
