@@ -1,31 +1,11 @@
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
+import { useApp } from '../../context/AppContext'
 import StatusBadge from '../../components/StatusBadge'
 
-const weeklyTrend = [
-  { day: 'Mon', score: 72 },
-  { day: 'Tue', score: 68 },
-  { day: 'Wed', score: 75 },
-  { day: 'Thu', score: 71 },
-  { day: 'Fri', score: 78 },
-  { day: 'Sat', score: 82 },
-  { day: 'Sun', score: 76 },
-]
-
-const athletes = [
-  { id: 1, name: 'Marcus Johnson', position: 'Point Guard', score: 87, avatar: 'MJ' },
-  { id: 2, name: 'DeShawn Williams', position: 'Shooting Guard', score: 64, avatar: 'DW' },
-  { id: 3, name: 'Tyler Chen', position: 'Small Forward', score: 42, avatar: 'TC' },
-  { id: 4, name: 'Jordan Mitchell', position: 'Power Forward', score: 78, avatar: 'JM' },
-  { id: 5, name: 'Andre Thompson', position: 'Center', score: 91, avatar: 'AT' },
-  { id: 6, name: 'Chris Rodriguez', position: 'Point Guard', score: 55, avatar: 'CR' },
-  { id: 7, name: 'Brandon Lee', position: 'Shooting Guard', score: 73, avatar: 'BL' },
-  { id: 8, name: 'Isaiah Brown', position: 'Small Forward', score: 38, avatar: 'IB' },
-  { id: 9, name: 'Kevin Davis', position: 'Power Forward', score: 82, avatar: 'KD' },
-  { id: 10, name: 'Ryan Martinez', position: 'Center', score: 69, avatar: 'RM' },
-]
-
 const getStatus = (score) => {
+  if (score === null || score === undefined) return 'none'
   if (score >= 70) return 'green'
   if (score >= 50) return 'yellow'
   return 'red'
@@ -36,7 +16,7 @@ const CustomTooltip = ({ active, payload, label }) => {
     return (
       <div className="bg-[#252525] border border-[#404040] rounded-lg px-3 py-2">
         <p className="text-[#a0a0a0] text-xs mb-1">{label}</p>
-        <p className="text-white font-semibold">{payload[0].value}</p>
+        <p className="text-white font-semibold">{payload[0].value ?? 'No data'}</p>
       </div>
     )
   }
@@ -44,13 +24,49 @@ const CustomTooltip = ({ active, payload, label }) => {
 }
 
 export default function CoachDashboard() {
-  const teamAverage = Math.round(athletes.reduce((sum, a) => sum + a.score, 0) / athletes.length)
-  const watchList = athletes.filter((a) => getStatus(a.score) === 'yellow').length
-  const alerts = athletes.filter((a) => getStatus(a.score) === 'red').length
-  const weeklyChange = '+4'
+  const { athletes, getTeamStats, getWeeklyTrend, getAthleteWithStats, notifications, clearNotifications } = useApp()
+  const [teamStats, setTeamStats] = useState({ teamAverage: 0, checkedInCount: 0, alertCount: 0, watchCount: 0 })
+  const [weeklyTrend, setWeeklyTrend] = useState([])
+  const [athletesWithStats, setAthletesWithStats] = useState([])
+  const [showNotifications, setShowNotifications] = useState(false)
 
-  // Sort athletes by score (lowest first for attention priority)
-  const sortedAthletes = [...athletes].sort((a, b) => a.score - b.score)
+  // Refresh data periodically to catch new check-ins
+  useEffect(() => {
+    const loadData = () => {
+      setTeamStats(getTeamStats())
+      setWeeklyTrend(getWeeklyTrend())
+      setAthletesWithStats(athletes.map(a => getAthleteWithStats(a)))
+    }
+
+    loadData()
+    const interval = setInterval(loadData, 5000) // Refresh every 5 seconds
+
+    return () => clearInterval(interval)
+  }, [athletes, getTeamStats, getWeeklyTrend, getAthleteWithStats])
+
+  // Sort athletes: those needing attention first (lowest scores), then unchecked
+  const sortedAthletes = [...athletesWithStats].sort((a, b) => {
+    // Unchecked athletes go to the end
+    if (!a.hasCheckedInToday && b.hasCheckedInToday) return 1
+    if (a.hasCheckedInToday && !b.hasCheckedInToday) return -1
+    // Among checked-in athletes, sort by score (lowest first)
+    if (a.hasCheckedInToday && b.hasCheckedInToday) {
+      return a.score - b.score
+    }
+    return 0
+  })
+
+  // Calculate weekly change
+  const getWeeklyChange = () => {
+    const validDays = weeklyTrend.filter(d => d.score !== null)
+    if (validDays.length < 2) return null
+
+    const recent = validDays[validDays.length - 1].score
+    const previous = validDays[0].score
+    return recent - previous
+  }
+
+  const weeklyChange = getWeeklyChange()
 
   return (
     <div className="space-y-6">
@@ -60,9 +76,28 @@ export default function CoachDashboard() {
           <h1 className="text-2xl font-bold">Eagles Basketball</h1>
           <p className="text-[#a0a0a0]">Team Wellness Dashboard</p>
         </div>
-        <div className="flex items-center gap-2 text-sm text-[#a0a0a0]">
-          <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-          {athletes.length} athletes checked in today
+        <div className="flex items-center gap-4">
+          {/* Notifications */}
+          <div className="relative">
+            <button
+              onClick={() => { setShowNotifications(!showNotifications); if (notifications.length > 0) clearNotifications(); }}
+              className="relative p-2 rounded-lg hover:bg-[#252525] transition-colors"
+            >
+              <svg className="w-6 h-6 text-[#a0a0a0]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+              </svg>
+              {notifications.length > 0 && (
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#ff5c5c] rounded-full flex items-center justify-center text-xs font-bold">
+                  {notifications.length}
+                </span>
+              )}
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2 text-sm text-[#a0a0a0]">
+            <div className={`w-2 h-2 rounded-full ${teamStats.checkedInCount > 0 ? 'bg-green-400 animate-pulse' : 'bg-[#606060]'}`} />
+            {teamStats.checkedInCount}/{athletes.length} checked in today
+          </div>
         </div>
       </div>
 
@@ -78,10 +113,10 @@ export default function CoachDashboard() {
               </svg>
             </div>
           </div>
-          <p className="text-3xl font-bold">{teamAverage}</p>
+          <p className="text-3xl font-bold">{teamStats.checkedInCount > 0 ? teamStats.teamAverage : '--'}</p>
           <div className="flex items-center gap-1 mt-1">
-            <StatusBadge status={getStatus(teamAverage)} size="sm" showLabel={false} />
-            <span className="text-xs text-[#606060]">out of 100</span>
+            {teamStats.checkedInCount > 0 && <StatusBadge status={getStatus(teamStats.teamAverage)} size="sm" showLabel={false} />}
+            <span className="text-xs text-[#606060]">{teamStats.checkedInCount > 0 ? 'out of 100' : 'No check-ins yet'}</span>
           </div>
         </div>
 
@@ -96,7 +131,7 @@ export default function CoachDashboard() {
               </svg>
             </div>
           </div>
-          <p className="text-3xl font-bold text-yellow-400">{watchList}</p>
+          <p className="text-3xl font-bold text-yellow-400">{teamStats.watchCount}</p>
           <p className="text-xs text-[#606060] mt-1">athletes to monitor</p>
         </div>
 
@@ -110,7 +145,7 @@ export default function CoachDashboard() {
               </svg>
             </div>
           </div>
-          <p className="text-3xl font-bold text-red-400">{alerts}</p>
+          <p className="text-3xl font-bold text-red-400">{teamStats.alertCount}</p>
           <p className="text-xs text-[#606060] mt-1">need attention</p>
         </div>
 
@@ -118,14 +153,23 @@ export default function CoachDashboard() {
         <div className="bg-[#1a1a1a] rounded-2xl p-5 border border-[#252525]">
           <div className="flex items-center justify-between mb-3">
             <span className="text-[#606060] text-sm">Weekly Change</span>
-            <div className="w-8 h-8 bg-green-500/20 rounded-lg flex items-center justify-center">
-              <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+              weeklyChange === null ? 'bg-[#252525]' :
+              weeklyChange >= 0 ? 'bg-green-500/20' : 'bg-red-500/20'
+            }`}>
+              <svg className={`w-4 h-4 ${weeklyChange === null ? 'text-[#606060]' : weeklyChange >= 0 ? 'text-green-400' : 'text-red-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                {weeklyChange >= 0 ? (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" />
+                )}
               </svg>
             </div>
           </div>
-          <p className="text-3xl font-bold text-green-400">{weeklyChange}</p>
-          <p className="text-xs text-[#606060] mt-1">vs last week</p>
+          <p className={`text-3xl font-bold ${weeklyChange === null ? 'text-[#606060]' : weeklyChange >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+            {weeklyChange === null ? '--' : `${weeklyChange >= 0 ? '+' : ''}${weeklyChange}`}
+          </p>
+          <p className="text-xs text-[#606060] mt-1">vs week start</p>
         </div>
       </div>
 
@@ -162,6 +206,7 @@ export default function CoachDashboard() {
                 strokeWidth={3}
                 dot={{ fill: '#ff5c5c', strokeWidth: 0, r: 5 }}
                 activeDot={{ fill: '#ff5c5c', strokeWidth: 0, r: 7 }}
+                connectNulls={false}
               />
             </LineChart>
           </ResponsiveContainer>
@@ -196,7 +241,12 @@ export default function CoachDashboard() {
                 <div className="w-10 h-10 rounded-full bg-[#252525] flex items-center justify-center text-sm font-medium text-[#a0a0a0]">
                   {athlete.avatar}
                 </div>
-                <span className="font-medium">{athlete.name}</span>
+                <div>
+                  <span className="font-medium">{athlete.name}</span>
+                  {athlete.streak >= 7 && (
+                    <span className="ml-2 text-xs">🔥</span>
+                  )}
+                </div>
               </div>
 
               {/* Position */}
@@ -206,17 +256,25 @@ export default function CoachDashboard() {
 
               {/* Score */}
               <div className="col-span-2 text-center">
-                <span className={`text-lg font-bold ${
-                  athlete.score >= 70 ? 'text-green-400' :
-                  athlete.score >= 50 ? 'text-yellow-400' : 'text-red-400'
-                }`}>
-                  {athlete.score}
-                </span>
+                {athlete.hasCheckedInToday ? (
+                  <span className={`text-lg font-bold ${
+                    athlete.score >= 70 ? 'text-green-400' :
+                    athlete.score >= 50 ? 'text-yellow-400' : 'text-red-400'
+                  }`}>
+                    {athlete.score}
+                  </span>
+                ) : (
+                  <span className="text-[#606060]">--</span>
+                )}
               </div>
 
               {/* Status */}
               <div className="col-span-2 flex justify-center">
-                <StatusBadge status={getStatus(athlete.score)} size="sm" />
+                {athlete.hasCheckedInToday ? (
+                  <StatusBadge status={getStatus(athlete.score)} size="sm" />
+                ) : (
+                  <span className="text-xs text-[#606060] bg-[#252525] px-2 py-1 rounded">Not checked in</span>
+                )}
               </div>
             </Link>
           ))}

@@ -1,7 +1,11 @@
 export default function ScoreCircle({ score, size = 'md', label }) {
+  const displayScore = score ?? 0
+  const hasScore = score !== null && score !== undefined
+
   const getColor = (score) => {
+    if (!hasScore) return { stroke: '#404040', text: 'text-[#606060]' }
     if (score >= 70) return { stroke: '#22c55e', text: 'text-green-400' }
-    if (score >= 40) return { stroke: '#eab308', text: 'text-yellow-400' }
+    if (score >= 50) return { stroke: '#eab308', text: 'text-yellow-400' }
     return { stroke: '#ef4444', text: 'text-red-400' }
   }
 
@@ -12,10 +16,10 @@ export default function ScoreCircle({ score, size = 'md', label }) {
   }
 
   const config = sizeConfig[size]
-  const color = getColor(score)
+  const color = getColor(displayScore)
   const radius = (config.width - config.strokeWidth) / 2
   const circumference = 2 * Math.PI * radius
-  const progress = ((100 - score) / 100) * circumference
+  const progress = ((100 - displayScore) / 100) * circumference
 
   return (
     <div className="flex flex-col items-center gap-2">
@@ -48,7 +52,7 @@ export default function ScoreCircle({ score, size = 'md', label }) {
         </svg>
         <div className="absolute inset-0 flex items-center justify-center">
           <span className={`font-bold ${config.fontSize} ${color.text}`}>
-            {score}
+            {hasScore ? displayScore : '--'}
           </span>
         </div>
       </div>

@@ -16,6 +16,12 @@ const statusConfig = {
     text: 'text-red-400',
     border: 'border-red-500/30',
     label: 'Alert'
+  },
+  none: {
+    bg: 'bg-[#252525]',
+    text: 'text-[#606060]',
+    border: 'border-[#404040]',
+    label: 'Pending'
   }
 }
 

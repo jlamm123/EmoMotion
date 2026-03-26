@@ -1,171 +1,128 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useApp } from '../../context/AppContext'
+import { moods, sleepOptions, generateInsights } from '../../data/mockData'
 import ScoreCircle from '../../components/ScoreCircle'
 
-const moods = [
-  { id: 'rough', label: 'Rough', emoji: '😫', value: 20 },
-  { id: 'low', label: 'Low', emoji: '😔', value: 40 },
-  { id: 'okay', label: 'Okay', emoji: '😐', value: 60 },
-  { id: 'good', label: 'Good', emoji: '😊', value: 80 },
-  { id: 'locked', label: 'Locked In', emoji: '🔥', value: 100 },
-]
-
-const sleepOptions = [
-  { id: 'poor', label: 'Poor', sublabel: '< 5 hrs', value: 25 },
-  { id: 'fair', label: 'Fair', sublabel: '5-6 hrs', value: 50 },
-  { id: 'good', label: 'Good', sublabel: '7-8 hrs', value: 75 },
-  { id: 'great', label: 'Great', sublabel: '8+ hrs', value: 100 },
-]
-
-const generateInsights = (mood, energy, sleep) => {
-  const insights = []
-
-  if (energy < 40) {
-    insights.push({
-      icon: '⚡',
-      title: 'Low Energy Detected',
-      text: 'Consider light stretching or a short walk to boost your energy before practice.',
-    })
-  } else if (energy >= 70) {
-    insights.push({
-      icon: '💪',
-      title: 'High Energy Today',
-      text: "You're primed for high-intensity training. Make the most of this energy!",
-    })
-  }
-
-  if (sleep < 50) {
-    insights.push({
-      icon: '😴',
-      title: 'Sleep Recovery Needed',
-      text: 'Poor sleep affects reaction time by 20%. Focus on rest tonight.',
-    })
-  } else if (sleep >= 75) {
-    insights.push({
-      icon: '✨',
-      title: 'Well Rested',
-      text: 'Great sleep quality! Your cognitive performance should be at its peak.',
-    })
-  }
-
-  if (mood >= 80) {
-    insights.push({
-      icon: '🎯',
-      title: 'Peak Mental State',
-      text: "You're in an optimal mindset for learning new skills and techniques.",
-    })
-  } else if (mood <= 40) {
-    insights.push({
-      icon: '🧠',
-      title: 'Mental Check-in',
-      text: 'Consider talking to a coach or teammate. Connection helps performance.',
-    })
-  }
-
-  // Always have at least 3 insights
-  const defaultInsights = [
-    { icon: '📊', title: 'Consistency Matters', text: 'Daily check-ins help identify patterns and optimize your training.' },
-    { icon: '🏃', title: 'Active Recovery', text: 'Light movement on rest days can improve next-day performance by 15%.' },
-    { icon: '💧', title: 'Stay Hydrated', text: 'Even 2% dehydration can reduce athletic performance significantly.' },
-  ]
-
-  while (insights.length < 3) {
-    const remaining = defaultInsights.filter(d => !insights.find(i => i.title === d.title))
-    if (remaining.length > 0) {
-      insights.push(remaining[Math.floor(Math.random() * remaining.length)])
-    } else {
-      break
-    }
-  }
-
-  return insights.slice(0, 3)
-}
-
 export default function AthleteCheckIn() {
-  const [step, setStep] = useState(0) // 0: welcome, 1: mood, 2: energy, 3: sleep, 4: scan, 5: results
+  const { user, saveCheckIn, showToast } = useApp()
+  const navigate = useNavigate()
+
+  const [step, setStep] = useState(1) // 1: mood, 2: energy, 3: sleep, 4: scan, 5: results
   const [selectedMood, setSelectedMood] = useState(null)
   const [energy, setEnergy] = useState(50)
   const [selectedSleep, setSelectedSleep] = useState(null)
   const [isScanning, setIsScanning] = useState(false)
   const [scanComplete, setScanComplete] = useState(false)
+  const [facialScore, setFacialScore] = useState(0)
   const [score, setScore] = useState(0)
   const [insights, setInsights] = useState([])
+  const [cameraError, setCameraError] = useState(false)
+  const [photoTaken, setPhotoTaken] = useState(false)
 
-  const totalSteps = 5
+  const videoRef = useRef(null)
+  const streamRef = useRef(null)
 
+  const totalSteps = 4
+
+  // Start camera when on scan step
   useEffect(() => {
-    if (step === 4 && !isScanning && !scanComplete) {
-      setIsScanning(true)
-      // Simulate facial scan
-      setTimeout(() => {
-        setIsScanning(false)
-        setScanComplete(true)
-      }, 3000)
+    if (step === 4 && !scanComplete) {
+      startCamera()
     }
-  }, [step, isScanning, scanComplete])
+    return () => {
+      stopCamera()
+    }
+  }, [step, scanComplete])
+
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: 640, height: 480 }
+      })
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream
+        streamRef.current = stream
+      }
+      setCameraError(false)
+    } catch (err) {
+      console.error('Camera error:', err)
+      setCameraError(true)
+      // Auto-proceed without camera
+      setTimeout(() => {
+        simulateScan()
+      }, 1000)
+    }
+  }
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop())
+      streamRef.current = null
+    }
+  }
+
+  const capturePhoto = () => {
+    setPhotoTaken(true)
+    setIsScanning(true)
+
+    // Simulate facial analysis
+    setTimeout(() => {
+      simulateScan()
+    }, 2500)
+  }
+
+  const simulateScan = () => {
+    // Generate random facial score between 50-90
+    const facial = Math.floor(Math.random() * 41) + 50
+    setFacialScore(facial)
+    setIsScanning(false)
+    setScanComplete(true)
+    stopCamera()
+  }
 
   const calculateScore = () => {
     const moodValue = selectedMood?.value || 50
     const sleepValue = selectedSleep?.value || 50
-    return Math.round((moodValue * 0.35) + (energy * 0.35) + (sleepValue * 0.3))
+    // Score = (mood * 0.30) + (energy * 0.25) + (sleep * 0.20) + (facial * 0.25)
+    return Math.round(
+      (moodValue * 0.30) +
+      (energy * 0.25) +
+      (sleepValue * 0.20) +
+      (facialScore * 0.25)
+    )
   }
 
   const handleComplete = () => {
     const finalScore = calculateScore()
     setScore(finalScore)
-    setInsights(generateInsights(selectedMood?.value || 50, energy, selectedSleep?.value || 50))
+    const generatedInsights = generateInsights(
+      selectedMood?.value || 50,
+      energy,
+      selectedSleep?.value || 50
+    )
+    setInsights(generatedInsights)
+
+    // Save check-in to database
+    const checkIn = {
+      id: `${user.id}-${new Date().toISOString().split('T')[0]}`,
+      athleteId: user.id,
+      timestamp: new Date().toISOString(),
+      mood: selectedMood,
+      energy,
+      sleep: selectedSleep,
+      facialScore,
+      score: finalScore,
+      insights: generatedInsights,
+    }
+    saveCheckIn(checkIn)
+    showToast('Check-in complete!', 'success')
+
     setStep(5)
   }
 
-  const resetCheckin = () => {
-    setStep(0)
-    setSelectedMood(null)
-    setEnergy(50)
-    setSelectedSleep(null)
-    setIsScanning(false)
-    setScanComplete(false)
-    setScore(0)
-    setInsights([])
-  }
-
-  // Welcome Screen
-  if (step === 0) {
-    return (
-      <div className="max-w-md mx-auto text-center py-12">
-        <div className="mb-8">
-          <div className="w-20 h-20 bg-[#ff5c5c] rounded-2xl flex items-center justify-center mx-auto mb-6">
-            <span className="text-4xl">🎯</span>
-          </div>
-          <h1 className="text-3xl font-bold mb-3">Daily Check-in</h1>
-          <p className="text-[#a0a0a0] text-lg">
-            Take 60 seconds to log how you're feeling today
-          </p>
-        </div>
-
-        <div className="bg-[#1a1a1a] rounded-2xl p-6 border border-[#252525] mb-8">
-          <div className="grid grid-cols-3 gap-4 text-center">
-            <div>
-              <p className="text-2xl font-bold text-[#ff5c5c]">5</p>
-              <p className="text-xs text-[#606060]">Questions</p>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-[#ff5c5c]">60s</p>
-              <p className="text-xs text-[#606060]">To Complete</p>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-[#ff5c5c]">AI</p>
-              <p className="text-xs text-[#606060]">Insights</p>
-            </div>
-          </div>
-        </div>
-
-        <button
-          onClick={() => setStep(1)}
-          className="w-full py-4 bg-[#ff5c5c] hover:bg-[#ff7a7a] rounded-xl font-semibold text-lg transition-colors"
-        >
-          Start Check-in
-        </button>
-      </div>
-    )
+  const handleDone = () => {
+    navigate('/athlete')
   }
 
   // Results Screen
@@ -173,6 +130,9 @@ export default function AthleteCheckIn() {
     return (
       <div className="max-w-md mx-auto py-8">
         <div className="text-center mb-8">
+          <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span className="text-3xl">✅</span>
+          </div>
           <h1 className="text-2xl font-bold mb-2">Check-in Complete!</h1>
           <p className="text-[#a0a0a0]">Here's your readiness score for today</p>
         </div>
@@ -184,6 +144,29 @@ export default function AthleteCheckIn() {
           <p className="text-center text-[#a0a0a0]">
             {score >= 70 ? "You're ready to perform!" : score >= 50 ? "Moderate readiness today" : "Take it easy today"}
           </p>
+
+          {/* Score breakdown */}
+          <div className="mt-6 pt-6 border-t border-[#252525]">
+            <p className="text-xs text-[#606060] text-center mb-4">Score Breakdown</p>
+            <div className="grid grid-cols-4 gap-2 text-center text-sm">
+              <div>
+                <p className="text-[#ff5c5c] font-bold">{selectedMood?.value}</p>
+                <p className="text-xs text-[#606060]">Mood</p>
+              </div>
+              <div>
+                <p className="text-[#ff5c5c] font-bold">{energy}</p>
+                <p className="text-xs text-[#606060]">Energy</p>
+              </div>
+              <div>
+                <p className="text-[#ff5c5c] font-bold">{selectedSleep?.value}</p>
+                <p className="text-xs text-[#606060]">Sleep</p>
+              </div>
+              <div>
+                <p className="text-[#ff5c5c] font-bold">{facialScore}</p>
+                <p className="text-xs text-[#606060]">Scan</p>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="bg-[#1a1a1a] rounded-2xl border border-[#252525] overflow-hidden mb-6">
@@ -208,7 +191,7 @@ export default function AthleteCheckIn() {
         </div>
 
         <button
-          onClick={resetCheckin}
+          onClick={handleDone}
           className="w-full py-4 bg-[#ff5c5c] hover:bg-[#ff7a7a] rounded-xl font-semibold transition-colors"
         >
           Done
@@ -366,34 +349,51 @@ export default function AthleteCheckIn() {
           </div>
 
           <div className="bg-[#1a1a1a] rounded-2xl border border-[#252525] overflow-hidden">
-            {/* Webcam placeholder */}
-            <div className="aspect-[4/3] bg-[#0a0a0a] relative flex items-center justify-center">
-              <div className="absolute inset-4 border-2 border-dashed border-[#404040] rounded-xl" />
+            {/* Camera / Scan Area */}
+            <div className="aspect-[4/3] bg-[#0a0a0a] relative flex items-center justify-center overflow-hidden">
+              {!cameraError && !scanComplete && (
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="absolute inset-0 w-full h-full object-cover"
+                />
+              )}
 
-              {/* Face outline */}
-              <div className="w-32 h-40 border-2 border-[#ff5c5c]/50 rounded-[50%] relative">
+              {/* Face outline overlay */}
+              <div className="absolute inset-4 border-2 border-dashed border-[#404040] rounded-xl pointer-events-none" />
+
+              {/* Face guide */}
+              <div className={`w-32 h-40 border-2 rounded-[50%] relative z-10 ${
+                scanComplete ? 'border-green-500' : isScanning ? 'border-[#ff5c5c] animate-pulse' : 'border-[#ff5c5c]/50'
+              }`}>
                 {isScanning && (
-                  <div className="absolute inset-0 border-2 border-[#ff5c5c] rounded-[50%] animate-pulse" />
+                  <div className="absolute inset-0 border-2 border-[#ff5c5c] rounded-[50%] animate-ping" />
                 )}
               </div>
 
               {/* Scanning line animation */}
               {isScanning && (
-                <div className="absolute inset-x-8 h-0.5 bg-gradient-to-r from-transparent via-[#ff5c5c] to-transparent animate-bounce"
-                     style={{ top: '50%' }} />
+                <div
+                  className="absolute inset-x-8 h-1 bg-gradient-to-r from-transparent via-[#ff5c5c] to-transparent animate-bounce z-20"
+                  style={{ top: '50%' }}
+                />
               )}
 
               {/* Status text */}
-              <div className="absolute bottom-4 left-0 right-0 text-center">
-                {isScanning ? (
-                  <div className="flex items-center justify-center gap-2">
+              <div className="absolute bottom-4 left-0 right-0 text-center z-20">
+                {cameraError ? (
+                  <span className="text-yellow-400 bg-black/50 px-3 py-1 rounded">Camera unavailable - using simulation</span>
+                ) : isScanning ? (
+                  <div className="flex items-center justify-center gap-2 bg-black/50 mx-auto w-fit px-4 py-2 rounded-full">
                     <div className="w-2 h-2 bg-[#ff5c5c] rounded-full animate-pulse" />
-                    <span className="text-[#ff5c5c]">Scanning...</span>
+                    <span className="text-[#ff5c5c]">Analyzing...</span>
                   </div>
                 ) : scanComplete ? (
-                  <span className="text-green-400">✓ Scan Complete</span>
+                  <span className="text-green-400 bg-black/50 px-3 py-1 rounded">✓ Analysis Complete</span>
                 ) : (
-                  <span className="text-[#606060]">Position your face in the frame</span>
+                  <span className="text-[#a0a0a0] bg-black/50 px-3 py-1 rounded">Position your face in the frame</span>
                 )}
               </div>
             </div>
@@ -412,21 +412,32 @@ export default function AthleteCheckIn() {
           <div className="flex gap-3">
             <button
               onClick={() => {
+                stopCamera()
                 setIsScanning(false)
                 setScanComplete(false)
+                setPhotoTaken(false)
                 setStep(3)
               }}
               className="flex-1 py-4 bg-[#252525] hover:bg-[#303030] rounded-xl font-semibold transition-colors"
             >
               Back
             </button>
-            <button
-              onClick={handleComplete}
-              disabled={!scanComplete}
-              className="flex-1 py-4 bg-[#ff5c5c] hover:bg-[#ff7a7a] disabled:bg-[#252525] disabled:text-[#606060] rounded-xl font-semibold transition-colors"
-            >
-              {scanComplete ? 'See Results' : 'Scanning...'}
-            </button>
+            {!scanComplete ? (
+              <button
+                onClick={capturePhoto}
+                disabled={isScanning}
+                className="flex-1 py-4 bg-[#ff5c5c] hover:bg-[#ff7a7a] disabled:bg-[#252525] disabled:text-[#606060] rounded-xl font-semibold transition-colors"
+              >
+                {isScanning ? 'Analyzing...' : 'Capture & Analyze'}
+              </button>
+            ) : (
+              <button
+                onClick={handleComplete}
+                className="flex-1 py-4 bg-[#ff5c5c] hover:bg-[#ff7a7a] rounded-xl font-semibold transition-colors"
+              >
+                See Results
+              </button>
+            )}
           </div>
         </div>
       )}

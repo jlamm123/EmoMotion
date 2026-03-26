@@ -1,47 +1,17 @@
+import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts'
+import { useApp } from '../../context/AppContext'
+import { generateCoachingRecommendation } from '../../data/mockData'
 import StatusBadge from '../../components/StatusBadge'
 import ScoreCircle from '../../components/ScoreCircle'
 
-const athleteData = {
-  1: { name: 'Marcus Johnson', position: 'Point Guard', score: 87, avatar: 'MJ', energy: 82, sleep: 'Great', mood: 'Locked In' },
-  2: { name: 'DeShawn Williams', position: 'Shooting Guard', score: 64, avatar: 'DW', energy: 58, sleep: 'Fair', mood: 'Okay' },
-  3: { name: 'Tyler Chen', position: 'Small Forward', score: 42, avatar: 'TC', energy: 35, sleep: 'Poor', mood: 'Rough' },
-  4: { name: 'Jordan Mitchell', position: 'Power Forward', score: 78, avatar: 'JM', energy: 75, sleep: 'Good', mood: 'Good' },
-  5: { name: 'Andre Thompson', position: 'Center', score: 91, avatar: 'AT', energy: 88, sleep: 'Great', mood: 'Locked In' },
-  6: { name: 'Chris Rodriguez', position: 'Point Guard', score: 55, avatar: 'CR', energy: 50, sleep: 'Fair', mood: 'Low' },
-  7: { name: 'Brandon Lee', position: 'Shooting Guard', score: 73, avatar: 'BL', energy: 70, sleep: 'Good', mood: 'Good' },
-  8: { name: 'Isaiah Brown', position: 'Small Forward', score: 38, avatar: 'IB', energy: 32, sleep: 'Poor', mood: 'Rough' },
-  9: { name: 'Kevin Davis', position: 'Power Forward', score: 82, avatar: 'KD', energy: 78, sleep: 'Great', mood: 'Good' },
-  10: { name: 'Ryan Martinez', position: 'Center', score: 69, avatar: 'RM', energy: 65, sleep: 'Good', mood: 'Okay' },
-}
-
 const getStatus = (score) => {
+  if (score === null || score === undefined) return 'none'
   if (score >= 70) return 'green'
   if (score >= 50) return 'yellow'
   return 'red'
 }
-
-// Generate unique history data based on athlete ID
-const generateHistoryData = (id, currentScore) => {
-  const baseScore = currentScore
-  const variance = 15
-  return [
-    { date: 'Mon', score: Math.max(0, Math.min(100, baseScore - 8 + (id % 5))), energy: Math.max(0, Math.min(100, baseScore - 10 + (id % 7))), sleep: Math.max(0, Math.min(100, baseScore - 5)) },
-    { date: 'Tue', score: Math.max(0, Math.min(100, baseScore - 12 + (id % 3))), energy: Math.max(0, Math.min(100, baseScore - 15)), sleep: Math.max(0, Math.min(100, baseScore + 2)) },
-    { date: 'Wed', score: Math.max(0, Math.min(100, baseScore - 5)), energy: Math.max(0, Math.min(100, baseScore - 8 + (id % 4))), sleep: Math.max(0, Math.min(100, baseScore - 3)) },
-    { date: 'Thu', score: Math.max(0, Math.min(100, baseScore + 2 - (id % 6))), energy: Math.max(0, Math.min(100, baseScore)), sleep: Math.max(0, Math.min(100, baseScore + 5)) },
-    { date: 'Fri', score: Math.max(0, Math.min(100, baseScore - 3)), energy: Math.max(0, Math.min(100, baseScore + 3)), sleep: Math.max(0, Math.min(100, baseScore - 2)) },
-    { date: 'Sat', score: Math.max(0, Math.min(100, baseScore + 5)), energy: Math.max(0, Math.min(100, baseScore + 8)), sleep: Math.max(0, Math.min(100, baseScore + 10)) },
-    { date: 'Sun', score: baseScore, energy: Math.max(0, Math.min(100, baseScore - 2)), sleep: Math.max(0, Math.min(100, baseScore + 3)) },
-  ]
-}
-
-const recentCheckins = [
-  { date: 'Today', mood: 'Locked In', energy: 82, sleep: 'Great' },
-  { date: 'Yesterday', mood: 'Good', energy: 75, sleep: 'Good' },
-  { date: '2 days ago', mood: 'Okay', energy: 68, sleep: 'Fair' },
-]
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
@@ -50,7 +20,7 @@ const CustomTooltip = ({ active, payload, label }) => {
         <p className="text-[#a0a0a0] text-xs mb-1">{label}</p>
         {payload.map((entry, index) => (
           <p key={index} className="text-sm" style={{ color: entry.color }}>
-            {entry.name}: {entry.value}
+            {entry.name}: {entry.value ?? 'N/A'}
           </p>
         ))}
       </div>
@@ -61,71 +31,106 @@ const CustomTooltip = ({ active, payload, label }) => {
 
 export default function PlayerDetail() {
   const { id } = useParams()
-  const athlete = athleteData[id] || { name: 'Unknown', position: 'N/A', score: 0, avatar: '??', energy: 0, sleep: 'N/A', mood: 'N/A' }
-  const status = getStatus(athlete.score)
-  const historyData = generateHistoryData(parseInt(id) || 1, athlete.score)
+  const { athletes, getAthleteWithStats, getCheckInsByAthleteId } = useApp()
 
-  // Generate dynamic insights based on athlete data
-  const getInsights = () => {
+  const [athlete, setAthlete] = useState(null)
+  const [checkIns, setCheckIns] = useState([])
+  const [historyData, setHistoryData] = useState([])
+  const [recommendation, setRecommendation] = useState(null)
+
+  useEffect(() => {
+    const athleteId = parseInt(id)
+    const baseAthlete = athletes.find(a => a.id === athleteId)
+
+    if (baseAthlete) {
+      const athleteWithStats = getAthleteWithStats(baseAthlete)
+      setAthlete(athleteWithStats)
+
+      const allCheckIns = getCheckInsByAthleteId(athleteId)
+      setCheckIns(allCheckIns)
+
+      // Generate history data for charts
+      const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+      const history = []
+
+      for (let i = 6; i >= 0; i--) {
+        const date = new Date()
+        date.setDate(date.getDate() - i)
+        const dateStr = date.toISOString().split('T')[0]
+
+        const checkIn = allCheckIns.find(c => c.timestamp.startsWith(dateStr))
+
+        history.push({
+          date: days[date.getDay()],
+          score: checkIn?.score ?? null,
+          energy: checkIn?.energy ?? null,
+          sleep: checkIn?.sleep?.value ?? null,
+          mood: checkIn?.mood?.value ?? null,
+        })
+      }
+
+      setHistoryData(history)
+      setRecommendation(generateCoachingRecommendation(allCheckIns))
+    }
+  }, [id, athletes, getAthleteWithStats, getCheckInsByAthleteId])
+
+  if (!athlete) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-[#a0a0a0]">Athlete not found</p>
+        <Link to="/coach" className="text-[#ff5c5c] hover:underline mt-2 inline-block">
+          Back to Dashboard
+        </Link>
+      </div>
+    )
+  }
+
+  const recentCheckIns = checkIns.slice(0, 5)
+  const status = athlete.hasCheckedInToday ? getStatus(athlete.score) : 'none'
+
+  // Generate additional insights based on patterns
+  const getPatternInsights = () => {
     const insights = []
 
-    if (athlete.score < 50) {
-      insights.push({
-        type: 'alert',
-        icon: '⚠️',
-        title: 'Attention Required',
-        text: `${athlete.name.split(' ')[0]}'s readiness is below optimal. Consider a 1-on-1 check-in to understand what's affecting their performance.`
-      })
+    if (recommendation) {
+      insights.push(recommendation)
     }
 
-    if (athlete.energy < 50) {
-      insights.push({
-        type: 'warning',
-        icon: '⚡',
-        title: 'Low Energy Pattern',
-        text: 'Energy levels have been consistently low. Consider reducing training intensity or checking for sleep issues.'
-      })
-    } else if (athlete.energy >= 80) {
-      insights.push({
-        type: 'positive',
-        icon: '💪',
-        title: 'High Energy',
-        text: 'Energy levels are excellent. This is a great time for high-intensity skill development.'
-      })
-    }
-
-    if (athlete.sleep === 'Poor') {
-      insights.push({
-        type: 'warning',
-        icon: '😴',
-        title: 'Sleep Quality Concern',
-        text: 'Poor sleep quality reported. Consider discussing sleep habits and recovery protocols.'
-      })
-    }
-
-    if (athlete.score >= 80) {
+    // Add streak insight
+    if (athlete.streak >= 7) {
       insights.push({
         type: 'positive',
         icon: '🔥',
-        title: 'Peak Performance Ready',
-        text: `${athlete.name.split(' ')[0]} is in excellent condition. Consider featuring them in high-pressure situations.`
+        title: 'Excellent Consistency',
+        text: `${athlete.streak}-day check-in streak! This athlete is committed to their wellness tracking.`,
+      })
+    } else if (athlete.streak === 0 && !athlete.hasCheckedInToday) {
+      insights.push({
+        type: 'info',
+        icon: '📱',
+        title: 'Encourage Check-in',
+        text: 'This athlete hasn\'t checked in today. A quick reminder might help.',
       })
     }
 
-    // Always show at least 2 insights
-    if (insights.length < 2) {
-      insights.push({
-        type: 'info',
-        icon: '📊',
-        title: 'Consistent Performance',
-        text: 'Metrics are stable. Continue monitoring for any significant changes.'
-      })
+    // Energy patterns
+    const energyCheckIns = checkIns.filter(c => c.energy !== undefined).slice(0, 7)
+    if (energyCheckIns.length >= 3) {
+      const avgEnergy = energyCheckIns.reduce((sum, c) => sum + c.energy, 0) / energyCheckIns.length
+      if (avgEnergy < 50) {
+        insights.push({
+          type: 'warning',
+          icon: '⚡',
+          title: 'Low Energy Pattern',
+          text: 'Average energy is below 50. Consider discussing workload and recovery.',
+        })
+      }
     }
 
     return insights.slice(0, 3)
   }
 
-  const insights = getInsights()
+  const patternInsights = getPatternInsights()
 
   return (
     <div className="space-y-6">
@@ -147,13 +152,25 @@ export default function PlayerDetail() {
               {athlete.avatar}
             </div>
             <div>
-              <h1 className="text-2xl font-bold">{athlete.name}</h1>
-              <p className="text-[#a0a0a0]">{athlete.position}</p>
+              <h1 className="text-2xl font-bold flex items-center gap-2">
+                {athlete.name}
+                {athlete.streak >= 7 && <span className="text-lg">🔥</span>}
+              </h1>
+              <p className="text-[#a0a0a0]">{athlete.position} • #{athlete.jerseyNumber}</p>
             </div>
           </div>
           <div className="flex items-center gap-6">
-            <ScoreCircle score={athlete.score} size="md" label="Today's Score" />
-            <StatusBadge status={status} size="lg" />
+            {athlete.hasCheckedInToday ? (
+              <>
+                <ScoreCircle score={athlete.score} size="md" label="Today's Score" />
+                <StatusBadge status={status} size="lg" />
+              </>
+            ) : (
+              <div className="text-center">
+                <p className="text-[#606060] text-sm">Not checked in today</p>
+                <p className="text-2xl mt-1">--</p>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -162,25 +179,50 @@ export default function PlayerDetail() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-[#1a1a1a] rounded-xl p-4 border border-[#252525]">
           <p className="text-[#606060] text-sm mb-1">Mood</p>
-          <p className="text-xl font-bold">{athlete.mood}</p>
+          <p className="text-xl font-bold">
+            {athlete.todayCheckIn?.mood?.label || '--'}
+          </p>
         </div>
         <div className="bg-[#1a1a1a] rounded-xl p-4 border border-[#252525]">
           <p className="text-[#606060] text-sm mb-1">Energy</p>
-          <p className={`text-xl font-bold ${athlete.energy >= 70 ? 'text-green-400' : athlete.energy >= 50 ? 'text-yellow-400' : 'text-red-400'}`}>
-            {athlete.energy}
+          <p className={`text-xl font-bold ${
+            !athlete.todayCheckIn ? 'text-[#606060]' :
+            athlete.todayCheckIn.energy >= 70 ? 'text-green-400' :
+            athlete.todayCheckIn.energy >= 50 ? 'text-yellow-400' : 'text-red-400'
+          }`}>
+            {athlete.todayCheckIn?.energy ?? '--'}
           </p>
         </div>
         <div className="bg-[#1a1a1a] rounded-xl p-4 border border-[#252525]">
           <p className="text-[#606060] text-sm mb-1">Sleep Quality</p>
-          <p className={`text-xl font-bold ${athlete.sleep === 'Great' ? 'text-green-400' : athlete.sleep === 'Good' ? 'text-green-400' : athlete.sleep === 'Fair' ? 'text-yellow-400' : 'text-red-400'}`}>
-            {athlete.sleep}
+          <p className={`text-xl font-bold ${
+            !athlete.todayCheckIn ? 'text-[#606060]' :
+            athlete.todayCheckIn.sleep.value >= 75 ? 'text-green-400' :
+            athlete.todayCheckIn.sleep.value >= 50 ? 'text-yellow-400' : 'text-red-400'
+          }`}>
+            {athlete.todayCheckIn?.sleep?.label ?? '--'}
           </p>
         </div>
         <div className="bg-[#1a1a1a] rounded-xl p-4 border border-[#252525]">
           <p className="text-[#606060] text-sm mb-1">7-Day Avg</p>
           <p className="text-xl font-bold text-[#ff5c5c]">
-            {Math.round(historyData.reduce((sum, d) => sum + d.score, 0) / historyData.length)}
+            {athlete.weeklyAvg ?? '--'}
           </p>
+        </div>
+      </div>
+
+      {/* Streak Card */}
+      <div className="bg-[#1a1a1a] rounded-xl p-4 border border-[#252525]">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-[#606060] text-sm mb-1">Check-in Streak</p>
+            <p className="text-2xl font-bold">
+              {athlete.streak} {athlete.streak === 1 ? 'day' : 'days'}
+            </p>
+          </div>
+          <div className="text-3xl">
+            {athlete.streak >= 7 ? '🔥' : athlete.streak >= 3 ? '⚡' : athlete.streak >= 1 ? '✨' : '💤'}
+          </div>
         </div>
       </div>
 
@@ -217,6 +259,7 @@ export default function PlayerDetail() {
                   strokeWidth={2}
                   fill="url(#scoreGradient)"
                   name="Readiness"
+                  connectNulls={false}
                 />
               </AreaChart>
             </ResponsiveContainer>
@@ -248,6 +291,7 @@ export default function PlayerDetail() {
                   strokeWidth={2}
                   dot={false}
                   name="Energy"
+                  connectNulls={false}
                 />
                 <Line
                   type="monotone"
@@ -256,6 +300,7 @@ export default function PlayerDetail() {
                   strokeWidth={2}
                   dot={false}
                   name="Sleep"
+                  connectNulls={false}
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -276,35 +321,64 @@ export default function PlayerDetail() {
       {/* Recent Check-ins */}
       <div className="bg-[#1a1a1a] rounded-2xl p-6 border border-[#252525]">
         <h2 className="text-lg font-semibold mb-4">Recent Check-ins</h2>
-        <div className="space-y-3">
-          {recentCheckins.map((checkin, index) => (
-            <div key={index} className="flex items-center justify-between p-4 bg-[#252525]/50 rounded-xl">
-              <div className="flex items-center gap-4">
-                <span className="text-sm text-[#606060] w-24">{checkin.date}</span>
-                <span className="px-3 py-1 bg-[#1a1a1a] rounded-full text-sm">{checkin.mood}</span>
-              </div>
-              <div className="flex items-center gap-6 text-sm">
-                <div className="flex items-center gap-2">
-                  <span className="text-[#606060]">Energy:</span>
-                  <span className="font-medium">{checkin.energy}</span>
+        {recentCheckIns.length > 0 ? (
+          <div className="space-y-3">
+            {recentCheckIns.map((checkIn, index) => {
+              const checkInDate = new Date(checkIn.timestamp)
+              const today = new Date()
+              const yesterday = new Date(today)
+              yesterday.setDate(yesterday.getDate() - 1)
+
+              let dateLabel
+              if (checkInDate.toDateString() === today.toDateString()) {
+                dateLabel = 'Today'
+              } else if (checkInDate.toDateString() === yesterday.toDateString()) {
+                dateLabel = 'Yesterday'
+              } else {
+                dateLabel = checkInDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+              }
+
+              return (
+                <div key={index} className="flex items-center justify-between p-4 bg-[#252525]/50 rounded-xl">
+                  <div className="flex items-center gap-4">
+                    <span className="text-sm text-[#606060] w-24">{dateLabel}</span>
+                    <span className="px-3 py-1 bg-[#1a1a1a] rounded-full text-sm flex items-center gap-1">
+                      {checkIn.mood.emoji} {checkIn.mood.label}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-6 text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[#606060]">Energy:</span>
+                      <span className="font-medium">{checkIn.energy}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[#606060]">Sleep:</span>
+                      <span className="font-medium">{checkIn.sleep.label}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[#606060]">Score:</span>
+                      <span className={`font-bold ${
+                        checkIn.score >= 70 ? 'text-green-400' :
+                        checkIn.score >= 50 ? 'text-yellow-400' : 'text-red-400'
+                      }`}>{checkIn.score}</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[#606060]">Sleep:</span>
-                  <span className="font-medium">{checkin.sleep}</span>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+              )
+            })}
+          </div>
+        ) : (
+          <p className="text-[#606060] text-center py-8">No check-ins recorded yet</p>
+        )}
       </div>
 
-      {/* AI Insights */}
+      {/* AI Coaching Insights */}
       <div className="bg-[#1a1a1a] rounded-2xl p-6 border border-[#252525]">
         <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-          <span className="text-[#ff5c5c]">✨</span> AI Insights
+          <span className="text-[#ff5c5c]">✨</span> AI Coaching Insights
         </h2>
         <div className="space-y-3">
-          {insights.map((insight, index) => (
+          {patternInsights.map((insight, index) => (
             <div key={index} className="flex items-start gap-3 p-4 bg-[#252525]/50 rounded-xl">
               <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 text-xl ${
                 insight.type === 'alert' ? 'bg-red-500/20' :
