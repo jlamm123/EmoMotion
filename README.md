@@ -13,30 +13,27 @@ The first AI platform that gives coaches a daily emotional readout of every athl
 
 ### Login & Athlete Selection
 <p align="center">
-  <img src="screenshots/login.png" width="400" alt="Login Screen">
-  <img src="screenshots/athlete-select.png" width="400" alt="Athlete Selection">
+  <img src="screenshots/01-login-screen.png" width="400" alt="Login Screen">
+  <img src="screenshots/02-athlete-select.png" width="400" alt="Athlete Selection">
 </p>
 
 ### Daily Check-in Flow
 <p align="center">
-  <img src="screenshots/mood.png" width="250" alt="Mood">
-  <img src="screenshots/energy.png" width="250" alt="Energy">
-  <img src="screenshots/sleep.png" width="250" alt="Sleep">
+  <img src="screenshots/04-mood-checkin.png" width="250" alt="Mood">
+  <img src="screenshots/05-energy-slider.png" width="250" alt="Energy">
+  <img src="screenshots/06-sleep-quality.png" width="250" alt="Sleep">
 </p>
 
 ### Results & Insights
 <p align="center">
-  <img src="screenshots/results.png" width="400" alt="Results">
+  <img src="screenshots/07-results-screen.png" width="400" alt="Results">
+  <img src="screenshots/08-athlete-home-complete.png" width="400" alt="Athlete Home">
 </p>
 
 ### Coach Dashboard
 <p align="center">
-  <img src="screenshots/coach-dashboard.png" width="700" alt="Coach Dashboard">
+  <img src="screenshots/10-coach-dashboard.png" width="700" alt="Coach Dashboard">
 </p>
-
-## Demo Video
-
-[![EmoMotion Demo](screenshots/demo-thumbnail.png)](https://youtube.com/your-video-link)
 
 ## Features
 
